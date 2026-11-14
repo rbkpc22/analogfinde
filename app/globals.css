@@ -1,26 +1,231 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-canvas: #070b14;
+  --color-panel: #121829;
+  --color-panel-2: #1a2238;
+  --color-line: #27314d;
+  --color-ink: #e8ecf5;
+  --color-muted: #8e9ab8;
+  --color-accent: #e9f542;
+  --color-moon: #c9d1e6;
+  --color-mars: #e0703a;
+  --color-earth: #4fa3ff;
+  --color-ok: #5fdc8f;
+  --color-bad: #ff6b6b;
   --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-display);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  min-height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #070b14;
+  color: #e8ecf5;
+}
+
+.starfield {
+  background-color: #070b14;
+  background-image:
+    radial-gradient(1.2px 1.2px at 6% 14%, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(1px 1px at 14% 62%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 22% 28%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1.4px 1.4px at 31% 78%, rgba(233, 245, 66, 0.7), transparent),
+    radial-gradient(1px 1px at 38% 18%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 47% 44%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 54% 86%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1.2px 1.2px at 63% 22%, rgba(255, 255, 255, 0.65), transparent),
+    radial-gradient(1px 1px at 71% 58%, rgba(201, 209, 230, 0.55), transparent),
+    radial-gradient(1px 1px at 79% 12%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1.3px 1.3px at 86% 36%, rgba(224, 112, 58, 0.55), transparent),
+    radial-gradient(1px 1px at 92% 72%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 18% 90%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 58% 8%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(ellipse 70% 40% at 8% -10%, rgba(233, 245, 66, 0.08), transparent 55%),
+    radial-gradient(ellipse 50% 36% at 100% 0%, rgba(224, 112, 58, 0.1), transparent 50%),
+    linear-gradient(180deg, #0c1222 0%, #070b14 38%, #070b14 100%);
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #27314d transparent;
+}
+
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: #27314d;
+  border-radius: 999px;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #27314d, #e9f542);
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #e9f542;
+  box-shadow: 0 0 0 4px rgba(233, 245, 66, 0.16);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: #e9f542;
+  box-shadow: 0 0 0 4px rgba(233, 245, 66, 0.16);
+  cursor: pointer;
+}
+
+.ok-list,
+.fail-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.15rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.ok-list li::marker {
+  content: "✓  ";
+  color: #5fdc8f;
+}
+
+.fail-list li::marker {
+  content: "✗  ";
+  color: #ff6b6b;
+}
+
+.leaflet-container {
+  background: #0b0f1a;
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+.leaflet-control-attribution {
+  background: rgba(7, 11, 20, 0.82) !important;
+  color: #8e9ab8 !important;
+  font-size: 10px !important;
+  line-height: 1.35;
+  max-width: min(72vw, 320px);
+  border-radius: 8px 0 0 0;
+}
+
+.leaflet-control-attribution a {
+  color: #e9f542 !important;
+}
+
+.leaflet-bar {
+  border: 1px solid #27314d !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.leaflet-bar a {
+  background: #121829 !important;
+  color: #e8ecf5 !important;
+  border-bottom-color: #27314d !important;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+}
+
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+  background: #1a2238 !important;
+  color: #e9f542 !important;
+}
+
+.leaflet-tooltip {
+  background: #121829;
+  color: #e8ecf5;
+  border: 1px solid #27314d;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  font-weight: 600;
+  padding: 4px 8px;
+}
+
+.leaflet-tooltip-top::before {
+  border-top-color: #27314d;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.4s ease;
+}
+
+@keyframes splash-bar {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.splash-copy {
+  animation: rise 0.7s ease;
+}
+
+.splash-bar {
+  animation: splash-bar 2.4s linear forwards;
+}
+
+.splash-leave {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+@media (max-width: 640px) {
+  .leaflet-control-attribution {
+    max-width: 42vw !important;
+    font-size: 9px !important;
+  }
+
+  .leaflet-top.leaflet-right {
+    margin-top: 8px;
+    margin-right: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .splash-copy,
+  .splash-bar {
+    animation: none;
+  }
+
+  .splash-bar {
+    transform: scaleX(1);
+  }
 }

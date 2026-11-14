@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AnalogFinder · Gemelos de la Luna y Marte en la Tierra</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{
+    --bg:#0b0f1a; --panel:#121829; --panel2:#1a2238; --line:#27314d;
+    --text:#e8ecf5; --muted:#8e9ab8; --accent:#e9f542; --moon:#c9d1e6; --mars:#e0703a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  header{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);background:#0e1322}
+  header h1{font-size:18px;margin:0;letter-spacing:.3px}
+  header h1 span{color:var(--accent)}
+  header p{margin:0;color:var(--muted);font-size:13px}
+  .app{display:grid;grid-template-columns:320px 1fr 360px;height:calc(100vh - 58px)}
+  aside{background:var(--panel);overflow-y:auto;padding:16px;border-right:1px solid var(--line)}
+  aside.right{border-right:none;border-left:1px solid var(--line)}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:18px 0 8px}
+  h2:first-child{margin-top:0}
+  .targets{display:grid;gap:6px}
+  .target{text-align:left;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px}
+  .target small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+  .target.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:10px;margin-right:6px;font-weight:600}
+  .tag.luna{background:var(--moon);color:#111}
+  .tag.marte{background:var(--mars);color:#111}
+  .w{display:grid;grid-template-columns:1fr 90px 18px;align-items:center;gap:6px;font-size:12px;margin:5px 0}
+  .w input{width:100%;accent-color:var(--accent)}
+  .w b{color:var(--accent);text-align:right}
+  label.chk{display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px;cursor:pointer}
+  #map{height:100%;width:100%}
+  .rank{list-style:none;padding:0;margin:0}
+  .rank li{display:grid;grid-template-columns:22px 1fr 46px;gap:8px;align-items:center;padding:7px 6px;border-radius:6px;cursor:pointer;font-size:13px}
+  .rank li:hover,.rank li.sel{background:var(--panel2)}
+  .rank .n{color:var(--muted);font-size:11px}
+  .rank .s{font-weight:700;text-align:right}
+  .rank .new{font-size:9px;color:#111;background:var(--accent);padding:1px 5px;border-radius:8px;margin-left:5px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:4px}
+  .card h3{margin:0 0 2px;font-size:17px}
+  .card .loc{color:var(--muted);font-size:12px;margin-bottom:10px}
+  .big{font-size:34px;font-weight:800}
+  .bars{margin:10px 0}
+  .bar{font-size:11px;margin:6px 0}
+  .bar .lbl{display:flex;justify-content:space-between;color:var(--muted)}
+  .track{position:relative;height:8px;background:#0b0f1a;border-radius:4px;margin-top:3px}
+  .track .e{position:absolute;left:0;top:0;height:8px;border-radius:4px;background:#4fa3ff}
+  .track .t{position:absolute;top:-3px;width:3px;height:14px;background:var(--accent);border-radius:2px}
+  .legend{font-size:11px;color:var(--muted);display:flex;gap:12px;margin-top:6px}
+  .legend i{display:inline-block;width:10px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+  .ok,.no{font-size:13px;line-height:1.45;margin:8px 0 0;padding-left:18px}
+  .ok li::marker{content:"✓  ";color:#5fdc8f}
+  .no li::marker{content:"✗  ";color:#ff6b6b}
+  p.txt{font-size:13px;line-height:1.5;margin:8px 0}
+  .note{font-size:11px;color:var(--muted);line-height:1.5;margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+  .leaflet-container{background:#0b0f1a}
+  @media (max-width:1000px){.app{grid-template-columns:1fr;height:auto}#map{height:55vh}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Analog<span>Finder</span></h1>
+  <p>¿Qué lugar de la Tierra se parece más a la Luna o a Marte… y en qué no?</p>
+</header>
+
+<div class="app">
+  <!-- Panel izquierdo: objetivo + pesos -->
+  <aside>
+    <h2>1 · Elige un objetivo</h2>
+    <div class="targets" id="targets"></div>
+
+    <h2>2 · ¿Qué te importa más?</h2>
+    <div id="weights"></div>
+    <label class="chk"><input type="checkbox" id="onlyNew" /> Solo lugares poco estudiados</label>
+
+    <div class="note">
+      Versión 0.1 · Los puntajes (0–10) por categoría son estimaciones del equipo
+      a partir de la literatura. Próximo paso: calcularlos con datos abiertos de
+      NASA (MODIS, NASADEM, Landsat, LRO LOLA/Diviner, MOLA, CRISM).
+    </div>
+  </aside>
+
+  <!-- Mapa -->
+  <main><div id="map"></div></main>
+
+  <!-- Panel derecho: ranking + detalle -->
+  <aside class="right">
+    <h2>Lugares más parecidos</h2>
+    <ul class="rank" id="rank"></ul>
+    <h2>Detalle</h2>
+    <div id="detail"><p class="txt" style="color:var(--muted)">Haz clic en un lugar del mapa o de la lista.</p></div>
+  </aside>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ============================================================
+   DIMENSIONES DE ANALOGÍA (todas en escala 0–10)
+   ============================================================ */
+const DIMS = [
+  { key:"aridez",    name:"Aridez" },
+  { key:"frio",      name:"Frío extremo" },
+  { key:"crateres",  name:"Cráteres" },
+  { key:"volcanico", name:"Volcanismo / basalto" },
+  { key:"polvo",     name:"Polvo, arena y dunas" },
+  { key:"hielo",     name:"Hielo / permafrost" },
+  { key:"subsuelo",  name:"Cuevas / tubos de lava" },
+  { key:"quimica",   name:"Minerales de agua (sales, yeso, arcillas)" },
+  { key:"vida",      name:"Habitabilidad / vida extrema" },
+];
+
+/* ============================================================
+   OBJETIVOS EN LA LUNA Y MARTE
+   ============================================================ */
+const TARGETS = [
+  { id:"luna-sur", body:"luna", name:"Polo sur lunar (cráter Shackleton)",
+    sub:"Zona candidata para bases de Artemis",
+    p:{aridez:10,frio:10,crateres:10,volcanico:3,polvo:8,hielo:8,subsuelo:3,quimica:2,vida:0} },
+  { id:"luna-mare", body:"luna", name:"Mares lunares (basalto)",
+    sub:"Llanuras volcánicas, posibles tubos de lava",
+    p:{aridez:10,frio:6,crateres:8,volcanico:10,polvo:8,hielo:0,subsuelo:7,quimica:1,vida:0} },
+  { id:"marte-jezero", body:"marte", name:"Cráter Jezero",
+    sub:"Antiguo delta y lago; sitio de Perseverance",
+    p:{aridez:9,frio:7,crateres:7,volcanico:4,polvo:7,hielo:2,subsuelo:2,quimica:9,vida:6} },
+  { id:"marte-dunas", body:"marte", name:"Dunas polares de yeso (Olympia Undae)",
+    sub:"Gran campo de dunas cerca del polo norte",
+    p:{aridez:10,frio:8,crateres:3,volcanico:2,polvo:10,hielo:5,subsuelo:1,quimica:8,vida:2} },
+  { id:"marte-tharsis", body:"marte", name:"Tharsis / Arsia Mons",
+    sub:"Volcanes gigantes y posibles entradas a cuevas",
+    p:{aridez:10,frio:8,crateres:4,volcanico:10,polvo:7,hielo:2,subsuelo:10,quimica:3,vida:4} },
+];
+
+/* ============================================================
+   LUGARES EN LA TIERRA
+   nuevo:true = poco estudiado como análogo (bonus del reto)
+   Datos descriptivos aproximados: verificar antes de entregar.
+   ============================================================ */
+const SITES = [
+  // --- Norte de México ---
+  { name:"Médanos de Samalayuca", where:"Chihuahua, México", lat:31.35, lng:-106.48, nuevo:true,
+    p:{aridez:8,frio:3,crateres:0,volcanico:1,polvo:10,hielo:0,subsuelo:0,quimica:2,vida:2},
+    desc:"Campo de dunas de arena de cuarzo en el desierto chihuahuense, a unos 50 km de Ciudad Juárez.",
+    prueba:"Movilidad de rovers en arena suelta, erosión por viento en equipos, formación de dunas." },
+  { name:"Cueva de los Cristales, Naica", where:"Chihuahua, México", lat:27.85, lng:-105.50, nuevo:true,
+    p:{aridez:1,frio:0,crateres:0,volcanico:2,polvo:0,hielo:0,subsuelo:10,quimica:8,vida:9},
+    desc:"Cueva con cristales gigantes de yeso, a unos 300 m de profundidad. Se reportaron microorganismos dentro de los cristales.",
+    prueba:"Búsqueda de vida en minerales, robots para cuevas, operación en ambientes hostiles." },
+  { name:"El Pinacate (cráter El Elegante)", where:"Sonora, México", lat:31.84, lng:-113.42, nuevo:true,
+    p:{aridez:9,frio:2,crateres:6,volcanico:10,polvo:7,hielo:0,subsuelo:5,quimica:3,vida:3},
+    desc:"Campo volcánico con grandes cráteres tipo maar y lava basáltica. Astronautas del programa Apolo entrenaron aquí.",
+    prueba:"Geología de campo para astronautas, navegación en terreno volcánico, muestreo de basalto." },
+  { name:"Gran Desierto de Altar", where:"Sonora, México", lat:32.00, lng:-114.20, nuevo:true,
+    p:{aridez:10,frio:2,crateres:0,volcanico:3,polvo:10,hielo:0,subsuelo:0,quimica:2,vida:2},
+    desc:"Uno de los campos de dunas activas más grandes de Norteamérica, con dunas en forma de estrella.",
+    prueba:"Comparar formas de dunas con imágenes de Marte y estudiar el movimiento del polvo." },
+  { name:"Cuatro Ciénegas", where:"Coahuila, México", lat:26.99, lng:-102.07, nuevo:false,
+    p:{aridez:7,frio:2,crateres:0,volcanico:0,polvo:6,hielo:0,subsuelo:2,quimica:8,vida:10},
+    desc:"Pozas en el desierto con tapetes microbianos y estromatolitos, parecidos a la vida temprana de la Tierra.",
+    prueba:"Reconocer biofirmas y entender cómo pudo haber vida en lagos antiguos de Marte." },
+  // --- Resto del mundo ---
+  { name:"White Sands", where:"Nuevo México, EE. UU.", lat:32.88, lng:-106.33, nuevo:false,
+    p:{aridez:8,frio:3,crateres:0,volcanico:1,polvo:10,hielo:0,subsuelo:0,quimica:9,vida:2},
+    desc:"Dunas de yeso blanco, uno de los pocos lugares de la Tierra con dunas de este mineral.",
+    prueba:"Comparación directa con las dunas de yeso del polo norte de Marte." },
+  { name:"Meteor Crater", where:"Arizona, EE. UU.", lat:35.03, lng:-111.02, nuevo:false,
+    p:{aridez:8,frio:3,crateres:10,volcanico:1,polvo:5,hielo:0,subsuelo:0,quimica:2,vida:1},
+    desc:"Cráter de impacto joven y bien conservado, de cerca de 1.2 km de diámetro.",
+    prueba:"Entender la forma de los cráteres de impacto y entrenar geología de campo." },
+  { name:"Death Valley", where:"California, EE. UU.", lat:36.25, lng:-116.82, nuevo:false,
+    p:{aridez:10,frio:1,crateres:2,volcanico:4,polvo:7,hielo:0,subsuelo:1,quimica:8,vida:3},
+    desc:"Uno de los lugares más calientes y secos del planeta, con salares y un cráter volcánico (Ubehebe).",
+    prueba:"Evaporitas y sales como pistas de agua antigua, pruebas térmicas de equipo." },
+  { name:"Desierto de Atacama", where:"Chile", lat:-24.50, lng:-69.25, nuevo:false,
+    p:{aridez:10,frio:5,crateres:1,volcanico:6,polvo:6,hielo:0,subsuelo:1,quimica:8,vida:5},
+    desc:"El desierto no polar más seco del mundo, con suelos ricos en sales y percloratos.",
+    prueba:"Límites de la vida en sequía extrema, pruebas de taladros y rovers." },
+  { name:"Cráter Haughton (isla Devon)", where:"Nunavut, Canadá", lat:75.38, lng:-89.67, nuevo:false,
+    p:{aridez:8,frio:9,crateres:10,volcanico:0,polvo:4,hielo:8,subsuelo:1,quimica:5,vida:4},
+    desc:"Cráter de impacto en un desierto polar. Sede de proyectos de NASA para simular misiones.",
+    prueba:"Operaciones de exploración completas, trajes y vehículos en frío y aislamiento." },
+  { name:"Valles Secos de McMurdo", where:"Antártida", lat:-77.50, lng:162.00, nuevo:false,
+    p:{aridez:10,frio:10,crateres:0,volcanico:3,polvo:6,hielo:10,subsuelo:2,quimica:6,vida:6},
+    desc:"Valles sin nieve, con frío extremo y vientos secos. Hay microbios viviendo dentro de las rocas.",
+    prueba:"Vida en frío extremo, permafrost y hielo enterrado como en Marte." },
+  { name:"Mauna Kea", where:"Hawái, EE. UU.", lat:19.82, lng:-155.47, nuevo:false,
+    p:{aridez:6,frio:5,crateres:4,volcanico:10,polvo:7,hielo:2,subsuelo:6,quimica:3,vida:2},
+    desc:"Volcán con ceniza y suelos basálticos muy parecidos al regolito lunar.",
+    prueba:"Usar recursos locales (fabricar materiales con el suelo), pruebas de rovers lunares." },
+  { name:"Holuhraun", where:"Islandia", lat:64.85, lng:-16.83, nuevo:false,
+    p:{aridez:4,frio:7,crateres:1,volcanico:10,polvo:6,hielo:6,subsuelo:3,quimica:4,vida:3},
+    desc:"Campo de lava muy reciente (2014–2015) rodeado de arena volcánica negra.",
+    prueba:"Pruebas de rovers en lava fresca y estudio de cómo el agua y la lava interactúan." },
+  { name:"Río Tinto", where:"Huelva, España", lat:37.70, lng:-6.60, nuevo:false,
+    p:{aridez:4,frio:1,crateres:0,volcanico:1,polvo:2,hielo:0,subsuelo:4,quimica:10,vida:9},
+    desc:"Río ácido y rojo, rico en hierro y sulfatos, con microbios que viven en esas condiciones.",
+    prueba:"Química parecida a la que encontraron rovers en Meridiani Planum, en Marte." },
+  { name:"Lava Beds", where:"California, EE. UU.", lat:41.71, lng:-121.51, nuevo:false,
+    p:{aridez:6,frio:5,crateres:1,volcanico:9,polvo:3,hielo:5,subsuelo:10,quimica:2,vida:5},
+    desc:"Cientos de tubos de lava, algunos con hielo dentro.",
+    prueba:"Robots que exploran y mapean cuevas, refugios contra la radiación." },
+  { name:"Cráter Lonar", where:"Maharashtra, India", lat:19.98, lng:76.51, nuevo:true,
+    p:{aridez:4,frio:1,crateres:10,volcanico:9,polvo:3,hielo:0,subsuelo:0,quimica:5,vida:5},
+    desc:"Cráter de impacto formado en roca basáltica, algo poco común en la Tierra.",
+    prueba:"Impactos sobre basalto, como en los mares lunares." },
+  { name:"Pilbara", where:"Australia Occidental", lat:-21.20, lng:119.40, nuevo:false,
+    p:{aridez:8,frio:1,crateres:1,volcanico:5,polvo:6,hielo:0,subsuelo:1,quimica:6,vida:10},
+    desc:"Rocas con algunas de las señales de vida más antiguas de la Tierra (estromatolitos de unos 3,500 millones de años).",
+    prueba:"Entrenar a ojos y algoritmos para reconocer biofirmas antiguas en rocas." },
+  { name:"Bockfjorden, Svalbard", where:"Noruega", lat:79.40, lng:13.30, nuevo:true,
+    p:{aridez:6,frio:9,crateres:0,volcanico:8,polvo:3,hielo:9,subsuelo:2,quimica:7,vida:5},
+    desc:"Volcanes y manantiales tibios en el Ártico, con carbonatos parecidos a los de un meteorito marciano.",
+    prueba:"Volcanismo + hielo + química del agua juntos, como en Marte antiguo." },
+  { name:"Craters of the Moon", where:"Idaho, EE. UU.", lat:43.42, lng:-113.52, nuevo:false,
+    p:{aridez:7,frio:6,crateres:3,volcanico:10,polvo:6,hielo:3,subsuelo:8,quimica:2,vida:2},
+    desc:"Gran campo de lava basáltica con conos y tubos de lava.",
+    prueba:"Caminatas de exploración, comunicaciones y geología volcánica." },
+];
+
+/* Lo que ningún lugar de la Tierra puede imitar */
+const LIMITES = {
+  luna:"Gravedad 1/6 de la Tierra, vacío total, sin campo magnético (radiación directa) y noches de unos 14 días.",
+  marte:"Gravedad ~38 % de la Tierra, atmósfera muy delgada de CO₂, más radiación y presión demasiado baja para agua líquida estable.",
+};
+
+/* ============================================================
+   ESTADO Y CÁLCULO DE SIMILITUD
+   ============================================================ */
+let target = TARGETS[0];
+const weights = Object.fromEntries(DIMS.map(d => [d.key, 1]));
+let selected = null;
+
+// Similitud = 100 × (1 − diferencia promedio ponderada / 10)
+function score(site){
+  let sumW = 0, sumD = 0;
+  for (const d of DIMS){
+    const w = weights[d.key];
+    sumW += w;
+    sumD += w * Math.abs(site.p[d.key] - target.p[d.key]);
+  }
+  return sumW === 0 ? 0 : Math.round(100 * (1 - sumD / (10 * sumW)));
+}
+
+function color(s){
+  if (s >= 80) return "#5fdc8f";
+  if (s >= 65) return "#e9f542";
+  if (s >= 50) return "#f5a142";
+  return "#ff6b6b";
+}
+
+/* ============================================================
+   MAPA
+   ============================================================ */
+const map = L.map("map", { worldCopyJump:true }).setView([25, -40], 2);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:"abcd", maxZoom:18
+}).addTo(map);
+const markers = SITES.map(site => {
+  const m = L.circleMarker([site.lat, site.lng], { radius:8, weight:2, color:"#0b0f1a", fillOpacity:.9 })
+    .addTo(map).on("click", () => select(site));
+  m.bindTooltip(site.name);
+  return m;
+});
+
+/* ============================================================
+   INTERFAZ
+   ============================================================ */
+function renderTargets(){
+  const el = document.getElementById("targets");
+  el.innerHTML = "";
+  TARGETS.forEach(t => {
+    const b = document.createElement("button");
+    b.className = "target" + (t === target ? " active" : "");
+    b.innerHTML = `<span class="tag ${t.body}">${t.body === "luna" ? "LUNA" : "MARTE"}</span>${t.name}<small>${t.sub}</small>`;
+    b.onclick = () => { target = t; renderTargets(); update(); };
+    el.appendChild(b);
+  });
+}
+
+function renderWeights(){
+  const el = document.getElementById("weights");
+  DIMS.forEach(d => {
+    const row = document.createElement("div");
+    row.className = "w";
+    row.innerHTML = `<span>${d.name}</span><input type="range" min="0" max="3" step="1" value="1"><b>1</b>`;
+    const input = row.querySelector("input"), out = row.querySelector("b");
+    input.oninput = () => { weights[d.key] = +input.value; out.textContent = input.value; update(); };
+    el.appendChild(row);
+  });
+}
+
+function update(){
+  const onlyNew = document.getElementById("onlyNew").checked;
+  const ranked = SITES.map((s, i) => ({ s, i, sc: score(s) }))
+    .filter(r => !onlyNew || r.s.nuevo)
+    .sort((a, b) => b.sc - a.sc);
+
+  // Marcadores
+  SITES.forEach((s, i) => {
+    const visible = !onlyNew || s.nuevo;
+    const sc = score(s);
+    markers[i].setStyle({ fillColor: color(sc), opacity: visible ? 1 : 0, fillOpacity: visible ? .9 : 0 });
+    markers[i].setRadius(visible ? 5 + sc / 12 : 0);
+  });
+
+  // Ranking
+  const ul = document.getElementById("rank");
+  ul.innerHTML = "";
+  ranked.forEach((r, k) => {
+    const li = document.createElement("li");
+    if (r.s === selected) li.className = "sel";
+    li.innerHTML = `<span class="n">${k + 1}</span><span>${r.s.name}${r.s.nuevo ? '<span class="new">NUEVO</span>' : ""}</span><span class="s" style="color:${color(r.sc)}">${r.sc}</span>`;
+    li.onclick = () => select(r.s, true);
+    ul.appendChild(li);
+  });
+
+  if (selected) renderDetail(selected);
+}
+
+function select(site, fly){
+  selected = site;
+  if (fly) map.flyTo([site.lat, site.lng], 6, { duration: .8 });
+  update();
+}
+
+function renderDetail(site){
+  const sc = score(site);
+  // Diferencias ponderadas por dimensión (solo las que tienen peso)
+  const diffs = DIMS.filter(d => weights[d.key] > 0).map(d => ({
+    d, e: site.p[d.key], t: target.p[d.key], diff: Math.abs(site.p[d.key] - target.p[d.key])
+  }));
+  const parecidos = [...diffs].sort((a, b) => a.diff - b.diff).filter(x => x.diff <= 2).slice(0, 3);
+  const fallas = [...diffs].sort((a, b) => b.diff - a.diff).filter(x => x.diff >= 4).slice(0, 3);
+  const cuerpo = target.body === "luna" ? "la Luna" : "Marte";
+
+  const bars = diffs.map(x => `
+    <div class="bar">
+      <div class="lbl"><span>${x.d.name}</span><span>${x.e} vs ${x.t}</span></div>
+      <div class="track"><div class="e" style="width:${x.e * 10}%"></div><div class="t" style="left:calc(${x.t * 10}% - 1px)"></div></div>
+    </div>`).join("");
+
+  document.getElementById("detail").innerHTML = `
+    <div class="card">
+      <h3>${site.name}</h3>
+      <div class="loc">${site.where}${site.nuevo ? " · poco estudiado como análogo" : ""}</div>
+      <div><span class="big" style="color:${color(sc)}">${sc}</span><span style="color:var(--muted)"> / 100 de parecido con ${target.name}</span></div>
+      <p class="txt">${site.desc}</p>
+
+      <h2>Se parece en</h2>
+      <ul class="ok">${parecidos.length ? parecidos.map(x => `<li>${x.d.name}</li>`).join("") : "<li>Ninguna categoría muy cercana</li>"}</ul>
+
+      <h2>Dónde falla la analogía</h2>
+      <ul class="no">
+        ${fallas.map(x => `<li>${x.d.name}: ${x.e > x.t ? "mucho más" : "mucho menos"} que en ${cuerpo}</li>`).join("")}
+        <li>${LIMITES[target.body]}</li>
+      </ul>
+
+      <h2>Qué se podría probar aquí</h2>
+      <p class="txt">${site.prueba}</p>
+
+      <h2>Comparación por categoría</h2>
+      <div class="bars">${bars}</div>
+      <div class="legend"><span><i style="background:#4fa3ff"></i>Tierra</span><span><i style="background:var(--accent)"></i>${target.body === "luna" ? "Luna" : "Marte"}</span></div>
+    </div>`;
+}
+
+document.getElementById("onlyNew").onchange = update;
+renderTargets();
+renderWeights();
+update();
+</script>
+</body>
+</html>

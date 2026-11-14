@@ -1,0 +1,116 @@
+{
+  "Médanos de Samalayuca": {
+    "T2M": 17.85,
+    "T2M_MAX": 42.41,
+    "T2M_MIN": -14.51,
+    "PRECTOTCORR": 0.69
+  },
+  "Cueva de los Cristales, Naica": {
+    "T2M": 19.38,
+    "T2M_MAX": 41.88,
+    "T2M_MIN": -9.78,
+    "PRECTOTCORR": 0.9
+  },
+  "El Pinacate (cráter El Elegante)": {
+    "T2M": 22.3,
+    "T2M_MAX": 48.41,
+    "T2M_MIN": -4.65,
+    "PRECTOTCORR": 0.51
+  },
+  "Gran Desierto de Altar": {
+    "T2M": 22.42,
+    "T2M_MAX": 48.73,
+    "T2M_MIN": -3.96,
+    "PRECTOTCORR": 0.29
+  },
+  "Cuatro Ciénegas": {
+    "T2M": 20.82,
+    "T2M_MAX": 43.29,
+    "T2M_MIN": -9.91,
+    "PRECTOTCORR": 1.04
+  },
+  "White Sands": {
+    "T2M": 16.33,
+    "T2M_MAX": 42.14,
+    "T2M_MIN": -15.51,
+    "PRECTOTCORR": 0.75
+  },
+  "Meteor Crater": {
+    "T2M": 11.36,
+    "T2M_MAX": 37.83,
+    "T2M_MIN": -22.36,
+    "PRECTOTCORR": 1.14
+  },
+  "Death Valley": {
+    "T2M": 19.1,
+    "T2M_MAX": 46.22,
+    "T2M_MIN": -6.16,
+    "PRECTOTCORR": 0.34
+  },
+  "Desierto de Atacama": {
+    "T2M": 14.51,
+    "T2M_MAX": 32.75,
+    "T2M_MIN": -4.33,
+    "PRECTOTCORR": 0.03
+  },
+  "Cráter Haughton (isla Devon)": {
+    "T2M": -14.42,
+    "T2M_MAX": 16.81,
+    "T2M_MIN": -48.55,
+    "PRECTOTCORR": 0.85
+  },
+  "Valles Secos de McMurdo": {
+    "T2M": -27.23,
+    "T2M_MAX": -3.79,
+    "T2M_MIN": -52.01,
+    "PRECTOTCORR": 0.22
+  },
+  "Mauna Kea": {
+    "T2M": 20.9,
+    "T2M_MAX": 28.67,
+    "T2M_MIN": 12.75,
+    "PRECTOTCORR": 4.41
+  },
+  "Holuhraun": {
+    "T2M": -2.84,
+    "T2M_MAX": 10.31,
+    "T2M_MIN": -23.83,
+    "PRECTOTCORR": 2.36
+  },
+  "Río Tinto": {
+    "T2M": 17.91,
+    "T2M_MAX": 45.03,
+    "T2M_MIN": -4.53,
+    "PRECTOTCORR": 1.24
+  },
+  "Lava Beds": {
+    "T2M": 8.83,
+    "T2M_MAX": 39.37,
+    "T2M_MIN": -23.88,
+    "PRECTOTCORR": 1.85
+  },
+  "Cráter Lonar": {
+    "T2M": 25.96,
+    "T2M_MAX": 45.55,
+    "T2M_MIN": 6.08,
+    "PRECTOTCORR": 2.31
+  },
+  "Pilbara": {
+    "T2M": 27.5,
+    "T2M_MAX": 48.95,
+    "T2M_MIN": 6.49,
+    "PRECTOTCORR": 1.11
+  },
+  "Bockfjorden, Svalbard": {
+    "T2M": -7.62,
+    "T2M_MAX": 11.85,
+    "T2M_MIN": -40.09,
+    "PRECTOTCORR": 1.82
+  },
+  "Craters of the Moon": {
+    "T2M": 5.69,
+    "T2M_MAX": 36.91,
+    "T2M_MIN": -32.62,
+    "PRECTOTCORR": 1.14
+  }
+}
