@@ -15,6 +15,8 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 
 setWorkerUrl("/maplibre-worker");
+import { formatCoord } from "@/lib/point";
+import { partialScoreLabel } from "@/lib/score";
 import type { MapSite, MapViewProps } from "@/lib/view";
 
 const GLOBE_ZOOM = 1.6;
@@ -83,12 +85,6 @@ function esc(value: string) {
   });
 }
 
-function formatCoord(lat: number, lng: number) {
-  const ns = lat >= 0 ? "N" : "S";
-  const ew = lng >= 0 ? "E" : "W";
-  return `${Math.abs(lat).toFixed(4)}°${ns} ${Math.abs(lng).toFixed(4)}°${ew}`;
-}
-
 function graticule() {
   const features: { type: "Feature"; properties: Record<string, never>; geometry: { type: "LineString"; coordinates: [number, number][] } }[] = [];
   for (let lng = -180; lng < 180; lng += 30) {
@@ -126,7 +122,10 @@ function popupHtml(site: MapSite) {
   const candidato =
     site.estado === "candidato"
       ? `<div style="margin:4px 0 6px;font-size:11px;letter-spacing:0.14em">CANDIDATO</div>`
-      : "";
+      : site.usoNasa
+        ? `<div style="margin:4px 0 6px;font-size:11px;letter-spacing:0.14em">NASA</div>`
+        : "";
+  const partial = partialScoreLabel(site);
   const extra = [
     site.altitud ? `<div><b>Altitud:</b> ${esc(site.altitud)}</div>` : "",
     site.ubicacion ? `<div><b>Ubicación:</b> ${esc(site.ubicacion)}</div>` : "",
@@ -143,11 +142,23 @@ function popupHtml(site: MapSite) {
     `<div>${esc(site.where)}</div>` +
     extra +
     `<div><b>Puntaje:</b> ${site.score}</div>` +
+    (partial ? `<div style="font-size:11px;letter-spacing:0.04em">${esc(partial)}</div>` : "") +
     more
   );
 }
 
-export default function MapView({ sites, selectedName, flyTarget, accent, onSelect }: MapViewProps) {
+export default function MapView({
+  sites,
+  selectedName,
+  flyTarget,
+  accent,
+  analyzing,
+  probe,
+  candidates,
+  onSelect,
+  onAnalyze,
+  onOpenCandidate,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const popupRef = useRef<Popup | null>(null);
@@ -159,11 +170,13 @@ export default function MapView({ sites, selectedName, flyTarget, accent, onSele
   const flownSeq = useRef<number | null>(null);
   const syncRef = useRef<() => void>(() => {});
   const flyRef = useRef<() => void>(() => {});
-  const propsRef = useRef({ sites, selectedName, flyTarget, onSelect, accent });
-  propsRef.current = { sites, selectedName, flyTarget, onSelect, accent };
+  const propsRef = useRef({ sites, selectedName, flyTarget, onSelect, onAnalyze, onOpenCandidate, accent, analyzing });
+  propsRef.current = { sites, selectedName, flyTarget, onSelect, onAnalyze, onOpenCandidate, accent, analyzing };
   const paintRef = useRef<() => void>(() => {});
   const [closeUp, setCloseUp] = useState(false);
   const [cursor, setCursor] = useState("");
+  const [mapReady, setMapReady] = useState(false);
+  const markersRef = useRef<Marker[]>([]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -283,6 +296,7 @@ export default function MapView({ sites, selectedName, flyTarget, accent, onSele
     let pulseFrame = 0;
     mapa.on("load", () => {
       readyRef.current = true;
+      setMapReady(true);
       spinningRef.current = !reduceMotion();
       mapa.addSource("sitios", {
         type: "geojson",
@@ -343,11 +357,19 @@ export default function MapView({ sites, selectedName, flyTarget, accent, onSele
         if (!site?.visible) return;
         propsRef.current.onSelect(site);
       });
+      mapa.on("click", (event) => {
+        if (!propsRef.current.analyzing) return;
+        const hits = mapa.queryRenderedFeatures(event.point, { layers: ["sitios"] });
+        if (hits.some((feature) => feature.properties?.visible === 1)) return;
+        const { lat, lng } = event.lngLat;
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+        propsRef.current.onAnalyze(lat, lng);
+      });
       mapa.on("mouseenter", "sitios", () => {
         mapa.getCanvas().style.cursor = "pointer";
       });
       mapa.on("mouseleave", "sitios", () => {
-        mapa.getCanvas().style.cursor = "";
+        mapa.getCanvas().style.cursor = propsRef.current.analyzing ? "crosshair" : "";
       });
       mapa.on("mousemove", (event) => {
         setCursor(formatCoord(event.lngLat.lat, event.lngLat.lng));
@@ -396,6 +418,7 @@ export default function MapView({ sites, selectedName, flyTarget, accent, onSele
       popupRef.current?.remove();
       crosshair.remove();
       readyRef.current = false;
+      setMapReady(false);
       syncRef.current = () => {};
       flyRef.current = () => {};
       paintRef.current = () => {};
@@ -417,6 +440,43 @@ export default function MapView({ sites, selectedName, flyTarget, accent, onSele
   useEffect(() => {
     flyRef.current();
   }, [flyTarget]);
+
+  useEffect(() => {
+    const canvas = mapRef.current?.getCanvas();
+    if (!canvas) return;
+    canvas.style.cursor = analyzing ? "crosshair" : "";
+  }, [analyzing, mapReady]);
+
+  useEffect(() => {
+    const mapa = mapRef.current;
+    if (!mapa || !mapReady) return;
+    for (const marker of markersRef.current) marker.remove();
+    const next: Marker[] = [];
+    if (probe?.status === "loading") {
+      const element = document.createElement("div");
+      element.className = "point-scan";
+      element.innerHTML =
+        '<span class="point-scan-ring" aria-hidden="true"></span><span class="point-scan-label">CONSULTANDO NASA POWER…</span>';
+      next.push(new Marker({ element, anchor: "center" }).setLngLat([probe.lng, probe.lat]).addTo(mapa));
+    }
+    const scanning = probe?.status === "loading" ? `${probe.queryLat},${probe.queryLng}` : "";
+    for (const candidate of candidates) {
+      if (`${candidate.queryLat},${candidate.queryLng}` === scanning) continue;
+      const element = document.createElement("button");
+      element.type = "button";
+      element.className = "candidate-ring";
+      element.setAttribute("aria-label", `Candidato ${formatCoord(candidate.lat, candidate.lng)}`);
+      element.addEventListener("click", (event) => {
+        event.stopPropagation();
+        propsRef.current.onOpenCandidate(candidate.id);
+      });
+      next.push(new Marker({ element, anchor: "center" }).setLngLat([candidate.lng, candidate.lat]).addTo(mapa));
+    }
+    markersRef.current = next;
+    return () => {
+      for (const marker of next) marker.remove();
+    };
+  }, [candidates, mapReady, probe]);
 
   function volver() {
     const mapa = mapRef.current;

@@ -99,8 +99,13 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
             </p>
             <p className="mt-2">
               Las otras siete categorías, y todo el perfil del objetivo en la Luna o en Marte, siguen siendo
-              estimaciones del equipo a partir de la literatura. En la interfaz aparecen como «Estimado».
+              estimaciones del equipo a partir de la literatura cuando hay un número. En la interfaz aparecen
+              como «Estimado». Si un lugar no trae número en una categoría, esa no entra al puntaje y la ficha
+              lo marca como puntaje parcial.
             </p>
+            <a href="/metodologia" className="kicker mt-3 inline-block text-accent">
+              Ver la página de metodología
+            </a>
           </section>
 
           <section>

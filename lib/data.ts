@@ -13,7 +13,7 @@ export type DimKey =
   | "quimica"
   | "vida";
 
-export type Profile = Record<DimKey, number>;
+export type Profile = Partial<Record<DimKey, number>>;
 
 export type Dimension = {
   key: DimKey;
@@ -48,6 +48,15 @@ export type VerificacionNasa = {
   uso: string;
 };
 
+export type Fuente = string | { nombre: string; url: string };
+
+export type Logistica = {
+  acceso?: string;
+  permisos?: string;
+  temporada?: string;
+  ciudad?: string;
+};
+
 export type Site = {
   name: string;
   where: string;
@@ -70,9 +79,11 @@ export type Site = {
   pruebas?: string[];
   limitaciones?: string[];
   verificacionNasa?: VerificacionNasa[];
-  fuentes?: string[];
+  fuentes?: Fuente[];
+  usoNasa?: string;
   proyectos?: string[];
   similitud?: Similitud;
+  logistica?: Logistica;
 };
 
 export const DIMS: Dimension[] = [
@@ -579,10 +590,22 @@ type AnalogRecord = {
   verificacion_nasa?: { recurso: string; uso: string }[];
   similitud?: Similitud;
   proyectos_recomendados?: string[];
-  fuentes?: string[];
+  fuentes?: Fuente[];
+  uso_nasa?: string;
+  perfil?: Partial<Record<DimKey, number | null>>;
+  logistica?: Logistica;
 };
 
+function profileFromRecord(perfil: AnalogRecord["perfil"]): Profile | undefined {
+  if (!perfil) return undefined;
+  const entries = Object.entries(perfil).filter(
+    (entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]),
+  );
+  return Object.fromEntries(entries);
+}
+
 function analogToSite(record: AnalogRecord): Site {
+  const perfil = profileFromRecord(record.perfil);
   return {
     id: record.id,
     name: record.nombre,
@@ -590,6 +613,7 @@ function analogToSite(record: AnalogRecord): Site {
     lat: record.lat,
     lng: record.lon,
     nuevo: record.estado === "candidato",
+    p: record.perfil ? (perfil ?? {}) : undefined,
     desc: record.descripcion ?? "",
     prueba: record.pruebas?.join(" ") ?? "",
     estado: record.estado,
@@ -604,8 +628,10 @@ function analogToSite(record: AnalogRecord): Site {
     limitaciones: record.limitaciones,
     verificacionNasa: record.verificacion_nasa,
     fuentes: record.fuentes,
+    usoNasa: record.uso_nasa,
     proyectos: record.proyectos_recomendados,
     similitud: record.similitud,
+    logistica: record.logistica,
   };
 }
 

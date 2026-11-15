@@ -1,4 +1,10 @@
 {
+  "Valle de Chihuahua-Sacramento": {
+    "T2M": 16.88,
+    "T2M_MAX": 39.2,
+    "T2M_MIN": -13.56,
+    "PRECTOTCORR": 0.96
+  },
   "Médanos de Samalayuca": {
     "T2M": 17.85,
     "T2M_MAX": 42.41,
@@ -112,5 +118,35 @@
     "T2M_MAX": 36.91,
     "T2M_MIN": -32.62,
     "PRECTOTCORR": 1.14
+  },
+  "Black Point Lava Flow": {
+    "T2M": 13.78,
+    "T2M_MAX": 40.98,
+    "T2M_MIN": -16.02,
+    "PRECTOTCORR": 0.93
+  },
+  "Cinder Lake Crater Field": {
+    "T2M": 13.78,
+    "T2M_MAX": 40.98,
+    "T2M_MIN": -16.02,
+    "PRECTOTCORR": 0.93
+  },
+  "Valle de los Diez Mil Humos": {
+    "T2M": 0.2,
+    "T2M_MAX": 27.6,
+    "T2M_MIN": -40.12,
+    "PRECTOTCORR": 3.31
+  },
+  "Kīlauea Iki": {
+    "T2M": 21.3,
+    "T2M_MAX": 29.05,
+    "T2M_MIN": 15.34,
+    "PRECTOTCORR": 6.3
+  },
+  "Mauna Ulu": {
+    "T2M": 21.3,
+    "T2M_MAX": 29.05,
+    "T2M_MIN": 15.34,
+    "PRECTOTCORR": 6.3
   }
 }

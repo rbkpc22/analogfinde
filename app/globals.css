@@ -197,6 +197,10 @@ input[type="range"]::-moz-range-thumb {
   background: #050505;
 }
 
+.intro-globe .maplibregl-ctrl {
+  display: none;
+}
+
 .maplibregl-map {
   font-family: var(--font-plex), sans-serif;
 }
@@ -375,10 +379,61 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 
+.point-scan {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+
+.point-scan-ring {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  animation: point-scan 1.4s ease-out infinite;
+}
+
+.point-scan-label {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  background: #050505;
+  color: var(--text);
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.candidate-ring {
+  width: 18px;
+  height: 18px;
+  border: 1.5px dashed var(--accent);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+@keyframes point-scan {
+  0% {
+    transform: scale(0.7);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rise,
   .term-line,
-  .scan-line {
+  .scan-line,
+  .point-scan-ring {
     animation: none;
   }
 

@@ -3,16 +3,42 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AboutDialog from "@/components/AboutDialog";
 import AnalogMap from "@/components/AnalogMap";
+import PlanetGame from "@/components/PlanetGame";
+import PointPanel from "@/components/PointPanel";
+import RadarChart from "@/components/RadarChart";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import { DIMS, LIMITES, SITES, TARGETS, type DimKey, type Site, type Target } from "@/lib/data";
-import { categoryLabel, earthProfile, nasaRecord, powerQueryUrl } from "@/lib/nasa";
+import { MISSIONS, sameWeights } from "@/lib/missions";
+import {
+  cachedPowerPoint,
+  categoryKnown,
+  categoryLabel,
+  earthProfile,
+  fetchPowerPoint,
+  nasaRecord,
+  powerPointUrl,
+  powerQueryUrl,
+  rememberPowerPoint,
+} from "@/lib/nasa";
+import {
+  cacheKey,
+  climateScore,
+  formatCoord,
+  loadCandidates,
+  roundCoord,
+  saveCandidates,
+  type Candidate,
+  type Probe,
+} from "@/lib/point";
 import {
   analogyLists,
   dimensionDiffs,
   initialWeights,
+  partialScoreLabel,
   scoreSite,
   type Weights,
 } from "@/lib/score";
+import type { Round } from "@/lib/game";
 import type { FlyTarget } from "@/lib/view";
 
 function BodyTag({ body }: { body: string }) {
@@ -28,7 +54,10 @@ function BodyTag({ body }: { body: string }) {
   );
 }
 
-function SourceTag({ dim, site }: { dim: DimKey; site?: Site }) {
+function SourceTag({ dim, site, missing }: { dim: DimKey; site?: Site; missing?: boolean }) {
+  if (missing) {
+    return <span className="kicker mt-0.5 block w-fit whitespace-nowrap text-muted">~ Sin dato</span>;
+  }
   const nasa = categoryLabel(dim, site) === "Dato NASA";
   return (
     <span className={`kicker mt-0.5 block w-fit whitespace-nowrap ${nasa ? "text-accent" : "text-muted"}`}>
@@ -90,8 +119,13 @@ export default function AnalogFinder() {
   const [selectedName, setSelectedName] = useState<string | null>(openingSelection);
   const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [gameOpen, setGameOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [probe, setProbe] = useState<Probe | null>(null);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const seq = useRef(0);
+  const analyzeSeq = useRef(0);
   const detailRef = useRef<HTMLDivElement>(null);
   const aboutButtonRef = useRef<HTMLButtonElement>(null);
   const followSelection = useRef(false);
@@ -118,16 +152,140 @@ export default function AnalogFinder() {
   const selectSite = useCallback((site: Site) => {
     followSelection.current = true;
     seq.current += 1;
+    analyzeSeq.current += 1;
+    setProbe(null);
     setSelectedName(site.name);
     setFlyTarget({ lat: site.lat, lng: site.lng, seq: seq.current });
   }, []);
 
   const closeWelcome = useCallback(() => setShowWelcome(false), []);
 
+  useEffect(() => {
+    setCandidates(loadCandidates());
+  }, []);
+
+  useEffect(() => {
+    if (!probe) return;
+    if (window.matchMedia("(max-width: 1000px)").matches) {
+      detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [probe]);
+
+  useEffect(() => {
+    if (!analyzing) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !aboutOpen && !gameOpen) setAnalyzing(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [aboutOpen, analyzing, gameOpen]);
+
+  const analyzePoint = useCallback((lat: number, lng: number) => {
+    const queryLat = roundCoord(lat);
+    const queryLng = roundCoord(lng);
+    const request = ++analyzeSeq.current;
+    const cached = cachedPowerPoint(queryLat, queryLng);
+    if (cached) {
+      setSelectedName(null);
+      setProbe({
+        status: "ready",
+        lat,
+        lng,
+        queryLat,
+        queryLng,
+        climate: cached.climate,
+        elevation: cached.elevation,
+      });
+      return;
+    }
+    setSelectedName(null);
+    setProbe({ status: "loading", lat, lng, queryLat, queryLng });
+    fetchPowerPoint(queryLat, queryLng)
+      .then((sample) => {
+        if (analyzeSeq.current !== request) return;
+        setProbe({
+          status: "ready",
+          lat,
+          lng,
+          queryLat,
+          queryLng,
+          climate: sample.climate,
+          elevation: sample.elevation,
+        });
+      })
+      .catch(() => {
+        if (analyzeSeq.current !== request) return;
+        setProbe({ status: "error", lat, lng, queryLat, queryLng });
+      });
+  }, []);
+
+  const openCandidate = useCallback((id: string) => {
+    const candidate = candidates.find((item) => item.id === id);
+    if (!candidate) return;
+    analyzeSeq.current += 1;
+    rememberPowerPoint(candidate.queryLat, candidate.queryLng, {
+      climate: candidate.climate,
+      elevation: candidate.elevation,
+    });
+    setSelectedName(null);
+    setProbe({
+      status: "ready",
+      lat: candidate.lat,
+      lng: candidate.lng,
+      queryLat: candidate.queryLat,
+      queryLng: candidate.queryLng,
+      climate: candidate.climate,
+      elevation: candidate.elevation,
+    });
+    seq.current += 1;
+    setFlyTarget({ lat: candidate.lat, lng: candidate.lng, seq: seq.current });
+  }, [candidates]);
+
+  const saveProbe = useCallback(() => {
+    if (!probe || probe.status !== "ready") return;
+    const candidate: Candidate = {
+      id: cacheKey(probe.queryLat, probe.queryLng),
+      lat: probe.lat,
+      lng: probe.lng,
+      queryLat: probe.queryLat,
+      queryLng: probe.queryLng,
+      climate: probe.climate,
+      elevation: probe.elevation,
+    };
+    setCandidates((current) => {
+      if (current.some((item) => item.id === candidate.id)) return current;
+      const next = [candidate, ...current];
+      saveCandidates(next);
+      return next;
+    });
+  }, [probe]);
+
+  const removeCandidate = useCallback((id: string) => {
+    setCandidates((current) => {
+      const next = current.filter((item) => item.id !== id);
+      saveCandidates(next);
+      return next;
+    });
+    setProbe((current) => (current && cacheKey(current.queryLat, current.queryLng) === id ? null : current));
+  }, []);
+
   const closeAbout = useCallback(() => {
     setAboutOpen(false);
     aboutButtonRef.current?.focus();
   }, []);
+
+  const showRound = useCallback(
+    (round: Round) => {
+      setGameOpen(false);
+      if (round.planet === "tierra" && round.siteName) {
+        const site = SITES.find((item) => item.name === round.siteName);
+        if (site) selectSite(site);
+        return;
+      }
+      if (round.targetId) setTargetId(round.targetId);
+    },
+    [selectSite],
+  );
 
   useEffect(() => {
     if (!selectedName || !followSelection.current) return;
@@ -147,7 +305,7 @@ export default function AnalogFinder() {
       className="starfield flex h-dvh flex-col overflow-hidden max-[1000px]:h-auto max-[1000px]:min-h-dvh max-[1000px]:overflow-x-hidden max-[1000px]:overflow-y-visible"
       style={{ "--accent": target.body === "luna" ? "#E6EEF5" : "#FF5A1F" } as React.CSSProperties}
     >
-      <header className="relative z-20 border-b border-line bg-panel/95">
+      <header className={`relative z-20 border-b border-line bg-panel/95 ${showWelcome ? "hidden" : ""}`}>
         <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -157,14 +315,23 @@ export default function AnalogFinder() {
                 <h1 className="display text-2xl leading-none">AnalogFinder</h1>
               </div>
             </div>
-            <button
-              ref={aboutButtonRef}
-              type="button"
-              onClick={() => setAboutOpen(true)}
-              className="kicker shrink-0 border border-line px-3 py-2 text-ink transition hover:border-accent hover:text-accent"
-            >
-              Acerca del proyecto
-            </button>
+            <div className="flex shrink-0 flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setGameOpen(true)}
+                className="kicker border border-line px-3 py-2 text-ink transition hover:border-accent hover:text-accent"
+              >
+                ¿Tierra, Luna o Marte?
+              </button>
+              <button
+                ref={aboutButtonRef}
+                type="button"
+                onClick={() => setAboutOpen(true)}
+                className="kicker border border-line px-3 py-2 text-ink transition hover:border-accent hover:text-accent"
+              >
+                Acerca del proyecto
+              </button>
+            </div>
           </div>
           <div className="lg:max-w-md lg:text-right">
             <p className="kicker text-muted">Centro de control de misión</p>
@@ -177,7 +344,7 @@ export default function AnalogFinder() {
       </header>
 
       <div className="relative z-10 grid min-h-0 flex-1 grid-cols-1 min-[1001px]:grid-cols-[minmax(280px,340px)_minmax(0,1fr)_minmax(300px,400px)]">
-        <aside className="scroll-thin border-line/80 bg-panel/88 min-[1001px]:overflow-y-auto min-[1001px]:border-r">
+        <aside className={`scroll-thin border-line/80 bg-panel/88 min-[1001px]:overflow-y-auto min-[1001px]:border-r ${showWelcome ? "hidden" : ""}`}>
           <div className="space-y-5 p-4 sm:p-5">
             <section>
               <h2 className="display mb-2 text-2xl text-muted">1 · Elige un objetivo</h2>
@@ -197,6 +364,28 @@ export default function AnalogFinder() {
                       <BodyTag body={item.body} />
                       <span className="mt-1 block text-sm">{item.name}</span>
                       <small className="mt-0.5 block text-[11px] text-muted">{item.sub}</small>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section>
+              <h2 className="display mb-2 text-2xl text-muted">¿Qué quieres probar?</h2>
+              <div className="border-t border-line">
+                {MISSIONS.map((mission) => {
+                  const active = sameWeights(weights, mission.weights);
+                  return (
+                    <button
+                      key={mission.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setWeights(mission.weights)}
+                      className={`block w-full border-b border-line px-2 py-2.5 text-left text-sm ${
+                        active ? "border-l-2 border-l-accent bg-white/[0.03]" : "hover:bg-white/[0.03]"
+                      }`}
+                    >
+                      {mission.name}
                     </button>
                   );
                 })}
@@ -251,18 +440,41 @@ export default function AnalogFinder() {
         <section
           className={
             showWelcome
-              ? "fixed top-0 left-0 z-[60] h-dvh w-screen md:left-[20vw]"
+              ? "intro-globe fixed top-1/2 z-[60] -translate-y-1/2 max-md:left-1/2 max-md:-translate-x-1/2 md:left-[70%] md:-translate-x-1/2"
               : "relative h-[52vh] min-h-[280px] border-line/80 min-[1001px]:h-full min-[1001px]:min-h-0 max-[1000px]:border-y sm:h-[58vh] sm:min-h-[320px]"
           }
+          style={showWelcome ? { width: "min(100dvh, 100vw)", height: "min(100dvh, 100vw)" } : undefined}
         >
           <AnalogMap
             sites={mapSites}
             selectedName={selectedName}
             flyTarget={flyTarget}
             accent={target.body === "luna" ? "#E6EEF5" : "#FF5A1F"}
+            analyzing={analyzing}
+            probe={probe}
+            candidates={candidates}
             onSelect={selectSite}
+            onAnalyze={(lat, lng) => analyzePoint(lat, lng)}
+            onOpenCandidate={openCandidate}
           />
           <div className="pointer-events-none absolute inset-0 z-[400]" />
+          {showWelcome ? null : (
+            <>
+          <button
+            type="button"
+            aria-pressed={analyzing}
+            onClick={() => setAnalyzing((current) => !current)}
+            className={`absolute top-16 right-2.5 z-[500] border px-3 py-2 font-mono text-[11px] tracking-[0.08em] uppercase max-[640px]:top-14 max-[640px]:px-2 ${
+              analyzing ? "border-accent bg-panel text-accent" : "border-line bg-panel/90 text-ink hover:border-accent"
+            }`}
+          >
+            ⌖ Analizar un punto
+          </button>
+          {analyzing ? (
+            <p className="pointer-events-none absolute top-28 right-2.5 z-[500] max-w-56 border border-line bg-[#050505] px-3 py-2 text-right font-mono text-[11px] leading-snug tracking-[0.04em] text-ink max-[640px]:top-24 max-[640px]:max-w-40">
+              Da clic en cualquier lugar del planeta
+            </p>
+          ) : null}
           <div className="brackets pointer-events-none absolute top-3 left-3 z-[500] max-w-[min(68%,280px)] border border-line bg-panel/90 px-3 py-2 max-[640px]:max-w-[58%] max-[640px]:px-2.5 max-[640px]:py-1.5">
             <p className="kicker text-muted">Objetivo</p>
             <p className="text-sm leading-snug font-medium max-[640px]:text-xs">{target.name}</p>
@@ -285,9 +497,11 @@ export default function AnalogFinder() {
               <span className="absolute right-0">100</span>
             </div>
           </div>
+            </>
+          )}
         </section>
 
-        <aside className="scroll-thin flex min-h-0 flex-col bg-panel/88 min-[1001px]:h-full min-[1001px]:overflow-hidden min-[1001px]:border-l min-[1001px]:border-line/80">
+        <aside className={`scroll-thin flex min-h-0 flex-col bg-panel/88 min-[1001px]:h-full min-[1001px]:overflow-hidden min-[1001px]:border-l min-[1001px]:border-line/80 ${showWelcome ? "hidden" : ""}`}>
           <div className="px-4 pt-4 sm:px-5">
             <div className="mb-2 flex items-end justify-between gap-3">
               <h2 className="display text-2xl text-muted">Lugares más parecidos</h2>
@@ -296,7 +510,8 @@ export default function AnalogFinder() {
               </p>
             </div>
           </div>
-          <ol className="scroll-thin max-h-72 overflow-y-auto border-t border-line min-[1001px]:max-h-[34%]">
+          <div className="scroll-thin max-h-72 overflow-y-auto border-t border-line min-[1001px]:max-h-[34%]">
+          <ol>
             {ranked.map((site, index) => {
               const active = site.name === selectedName;
               return (
@@ -311,11 +526,14 @@ export default function AnalogFinder() {
                   >
                     <span className="font-mono text-[11px] text-muted tabular-nums">{index + 1}</span>
                     <span className="min-w-0 leading-snug">
-                      {site.name}
-                      {site.estado === "candidato" ? (
-                        <span className="kicker ml-2 text-accent">Candidato</span>
-                      ) : site.nuevo ? (
-                        <span className="kicker ml-2 text-muted">Nuevo</span>
+                      <span>
+                        {site.name}
+                        <SiteMark site={site} className="ml-2" />
+                      </span>
+                      {partialScoreLabel(site) ? (
+                        <span className="mt-0.5 block font-mono text-[10px] leading-snug tracking-[0.04em] text-muted">
+                          {partialScoreLabel(site)}
+                        </span>
                       ) : null}
                     </span>
                     <span
@@ -329,10 +547,54 @@ export default function AnalogFinder() {
               );
             })}
           </ol>
+            {candidates.length > 0 ? (
+              <section className="border-t border-line px-4 py-3 sm:px-5">
+                <h3 className="display text-xl text-muted">Mis candidatos</h3>
+                <ul className="mt-2">
+                  {candidates.map((candidate) => {
+                    const score = climateScore(candidate.climate, target, weights);
+                    const active =
+                      probe?.status === "ready" &&
+                      probe.queryLat === candidate.queryLat &&
+                      probe.queryLng === candidate.queryLng;
+                    return (
+                      <li key={candidate.id} className="flex items-center gap-2 border-b border-line py-2">
+                        <button
+                          type="button"
+                          onClick={() => openCandidate(candidate.id)}
+                          className={`min-w-0 flex-1 text-left ${active ? "text-accent" : ""}`}
+                        >
+                          <span className="block font-mono text-[11px] tabular-nums">{formatCoord(candidate.lat, candidate.lng)}</span>
+                          <span className="font-mono text-sm tabular-nums">{score === null ? "—" : score}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeCandidate(candidate.id)}
+                          className="kicker shrink-0 border border-line px-2 py-1 text-muted hover:border-accent hover:text-accent"
+                        >
+                          Borrar
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ) : null}
+          </div>
 
           <div ref={detailRef} className="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-5 sm:px-5">
             <h2 className="display mb-2 text-2xl text-muted">Detalle</h2>
-            {selected ? (
+            {probe ? (
+              <PointPanel
+                probe={probe}
+                target={target}
+                weights={weights}
+                saved={candidates.some((item) => item.id === cacheKey(probe.queryLat, probe.queryLng))}
+                onRetry={() => analyzePoint(probe.lat, probe.lng)}
+                onSave={saveProbe}
+                onGoToSite={selectSite}
+              />
+            ) : selected ? (
               <Detail site={selected} target={target} weights={weights} />
             ) : (
               <p className="border border-line px-4 py-8 text-center text-sm text-muted">
@@ -344,6 +606,7 @@ export default function AnalogFinder() {
       </div>
       {showWelcome ? <WelcomeScreen onDone={closeWelcome} siteCount={SITES.length} /> : null}
       {aboutOpen ? <AboutDialog onClose={closeAbout} /> : null}
+      {gameOpen ? <PlanetGame onClose={() => setGameOpen(false)} onShow={showRound} /> : null}
     </div>
   );
 }
@@ -351,15 +614,17 @@ export default function AnalogFinder() {
 function Detail({ site, target, weights }: { site: Site; target: Target; weights: Weights }) {
   const score = scoreSite(site, target, weights);
   const diffs = dimensionDiffs(site, target, weights);
-  const { parecidos, fallas } = analogyLists(diffs);
+  const known = diffs.filter((item) => !item.missing);
+  const { parecidos, fallas } = analogyLists(known);
   const cuerpo = target.body === "luna" ? "la Luna" : "Marte";
+  const objetivo = target.body === "luna" ? "Luna" : "Marte";
 
   return (
     <article key={`${site.name}-${target.id}`} className="brackets relative overflow-hidden border border-line bg-panel p-4">
       <span className="scan-line" aria-hidden="true" />
       <h3 className="display text-2xl leading-none">{site.name}</h3>
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        {site.estado === "candidato" ? <span className="kicker text-accent">Candidato</span> : null}
+        <SiteMark site={site} />
         {site.analogoDe?.map((body) => (
           <BodyTag key={body} body={body} />
         ))}
@@ -373,6 +638,9 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
         <CountUp value={score} />
         <span className="pb-2 font-mono text-sm text-muted tabular-nums">/ 100 de parecido con {target.name}</span>
       </p>
+      {partialScoreLabel(site) ? (
+        <p className="mt-1 font-mono text-[11px] tracking-[0.04em] text-muted">{partialScoreLabel(site)}</p>
+      ) : null}
       {!site.p && site.similitud ? (
         <p className="mt-2 text-[11px] leading-relaxed text-muted">
           Este puntaje es el promedio de la similitud del expediente (terreno, suelo, clima, vida y
@@ -381,8 +649,22 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
       ) : null}
 
       {site.desc ? <p className="mt-3 text-sm leading-relaxed">{site.desc}</p> : null}
+      <SiteSources site={site} />
 
       <Dossier site={site} />
+      <Logistics site={site} />
+
+      {site.p ? (
+        <section className="mt-4">
+          <h4 className="display text-2xl text-muted">Perfil</h4>
+          <RadarChart
+            earth={earthProfile(site)}
+            target={target.p}
+            targetName={objetivo}
+            known={DIMS.map((dim) => categoryKnown(site, dim.key))}
+          />
+        </section>
+      ) : null}
 
       {diffs.length > 0 ? (
         <>
@@ -391,7 +673,7 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
             {parecidos.length > 0 ? (
               parecidos.map((item) => (
                 <li key={item.key}>
-                  {item.name} <SourceTag dim={item.key} site={site} />
+                  {item.name} <SourceTag dim={item.key} site={site} missing={item.missing} />
                 </li>
               ))
             ) : (
@@ -403,7 +685,7 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
           <ul className="fail-list">
             {fallas.map((item) => (
               <li key={item.key}>
-                {item.name} <SourceTag dim={item.key} site={site} />:{" "}
+                {item.name} <SourceTag dim={item.key} site={site} missing={item.missing} />:{" "}
                 {item.earth > item.target ? "mucho más" : "mucho menos"} que en {cuerpo}
               </li>
             ))}
@@ -429,22 +711,28 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
               <div key={item.key}>
                 <div className="flex items-baseline justify-between gap-3 text-[13px]">
                   <span>
-                    {item.name} <SourceTag dim={item.key} site={site} />
+                    {item.name} {item.missing ? null : <SourceTag dim={item.key} site={site} />}
                   </span>
                 </div>
-                <div className="mt-1 flex h-2 items-stretch">
-                  <div className="flex w-1/2 justify-end bg-white/[0.04]">
-                    <div className="h-full bg-[#d7d7d7]" style={{ width: `${item.earth * 10}%` }} />
-                  </div>
-                  <div className="w-px shrink-0 bg-accent" />
-                  <div className="flex w-1/2 justify-start bg-white/[0.04]">
-                    <div className="h-full bg-accent" style={{ width: `${item.target * 10}%` }} />
-                  </div>
-                </div>
-                <div className="mt-0.5 flex justify-between font-mono text-[11px] tabular-nums">
-                  <span>{item.earth}</span>
-                  <span className="text-accent">{item.target}</span>
-                </div>
+                {item.missing ? (
+                  <p className="mt-1 font-mono text-[11px] text-muted">— sin dato</p>
+                ) : (
+                  <>
+                    <div className="mt-1 flex h-2 items-stretch">
+                      <div className="flex w-1/2 justify-end bg-white/[0.04]">
+                        <div className="h-full bg-[#d7d7d7]" style={{ width: `${item.earth * 10}%` }} />
+                      </div>
+                      <div className="w-px shrink-0 bg-accent" />
+                      <div className="flex w-1/2 justify-start bg-white/[0.04]">
+                        <div className="h-full bg-accent" style={{ width: `${item.target * 10}%` }} />
+                      </div>
+                    </div>
+                    <div className="mt-0.5 flex justify-between font-mono text-[11px] tabular-nums">
+                      <span>{item.earth}</span>
+                      <span className="text-accent">{item.target}</span>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -464,6 +752,30 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
   );
 }
 
+function Logistics({ site }: { site: Site }) {
+  const rows = [
+    ["Acceso", site.logistica?.acceso],
+    ["Permisos", site.logistica?.permisos],
+    ["Mejor temporada", site.logistica?.temporada],
+    ["Ciudad más cercana", site.logistica?.ciudad],
+  ] as const;
+
+  return (
+    <section className="mt-4">
+      <h4 className="display text-2xl text-muted">Logística de pruebas</h4>
+      <dl className="mt-2 border-t border-line">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line py-1.5">
+            <dt className="text-sm text-muted">{label}</dt>
+            <dd className={`text-right text-sm ${value ? "" : "text-muted"}`}>{value || "Por llenar"}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-1 text-[11px] text-muted">Permisos: anótalo si el lugar es un área protegida.</p>
+    </section>
+  );
+}
+
 function Dossier({ site }: { site: Site }) {
   const hasFacts = site.altitud || site.ubicacion || site.tipoTerreno;
   if (
@@ -473,7 +785,6 @@ function Dossier({ site }: { site: Site }) {
     !site.pruebas?.length &&
     !site.limitaciones?.length &&
     !site.verificacionNasa?.length &&
-    !site.fuentes?.length &&
     !site.proyectos?.length
   ) {
     return null;
@@ -530,9 +841,52 @@ function Dossier({ site }: { site: Site }) {
         </section>
       ) : null}
 
-      <FactList title="Fuentes" items={site.fuentes} />
       <FactList title="Proyectos recomendados" items={site.proyectos} />
     </div>
+  );
+}
+
+function SiteMark({ site, className = "" }: { site: Site; className?: string }) {
+  const label = site.estado === "candidato" ? "Candidato" : site.usoNasa ? "NASA" : site.nuevo ? "Nuevo" : null;
+  if (!label) return null;
+  const tone = label === "Nuevo" ? "text-muted" : "text-accent";
+  return <span className={`kicker ${tone} ${className}`}>{label}</span>;
+}
+
+function SiteSources({ site }: { site: Site }) {
+  if (!site.usoNasa && !site.fuentes?.length) return null;
+  return (
+    <>
+      {site.usoNasa ? (
+        <section className="mt-4">
+          <h4 className="display text-2xl text-muted">Uso de la NASA</h4>
+          <p className="mt-1 text-sm leading-relaxed">{site.usoNasa}</p>
+        </section>
+      ) : null}
+      {site.fuentes && site.fuentes.length > 0 ? (
+        <section className="mt-4">
+          <h4 className="display text-2xl text-muted">Fuentes</h4>
+          <ul className="mt-1 list-disc space-y-1 pl-4 text-sm leading-relaxed">
+            {site.fuentes.map((item) =>
+              typeof item === "string" ? (
+                <li key={item}>{item}</li>
+              ) : (
+                <li key={item.url}>
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent underline decoration-accent/40 underline-offset-2"
+                  >
+                    {item.nombre}
+                  </a>
+                </li>
+              ),
+            )}
+          </ul>
+        </section>
+      ) : null}
+    </>
   );
 }
 
@@ -575,8 +929,10 @@ function NasaPower({ site }: { site: Site }) {
       </dl>
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
         Frío {profile.frio}/10 con la temperatura media y aridez {profile.aridez}/10 con la precipitación.
-        El valor anual de la máxima es el mes más cálido y el de la mínima, el mes más frío. Las demás
-        categorías siguen siendo estimaciones.
+        El valor anual de la máxima es el mes más cálido y el de la mínima, el mes más frío.{" "}
+        {DIMS.some((dim) => dim.key !== "frio" && dim.key !== "aridez" && typeof site.p?.[dim.key] === "number")
+          ? "Las demás categorías siguen siendo estimaciones."
+          : "Las demás categorías de este lugar no tienen dato y no entran al puntaje."}
       </p>
       <p className="mt-1 text-[11px] leading-relaxed text-muted">
         Fuente:{" "}

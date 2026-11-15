@@ -1,4 +1,4 @@
-import { type DimKey, type Profile, type Site } from "./data";
+import { DIMS, type DimKey, type Profile, type Site } from "./data";
 import nasaPower from "./nasa-power.json";
 
 export type NasaAnnual = {
@@ -51,28 +51,27 @@ export function aridezFromPrecipitation(mmPerDay: number): number {
   return scaleScore((10 * (4 - mmPerDay)) / 3.8);
 }
 
-const EMPTY_PROFILE: Profile = {
-  aridez: 0,
-  frio: 0,
-  crateres: 0,
-  volcanico: 0,
-  polvo: 0,
-  hielo: 0,
-  subsuelo: 0,
-  quimica: 0,
-  vida: 0,
-};
+function categoryOrZero(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
 
-/** Perfil del lugar: frío y aridez salen de NASA POWER; el resto conserva la estimación. */
+/** Perfil del lugar. Frío y aridez salen de NASA POWER cuando hay climatología. Una categoría ausente queda en 0 aquí, pero el puntaje la omite. */
 export function earthProfile(site: Site): Profile {
-  if (!site.p) return EMPTY_PROFILE;
+  const base = Object.fromEntries(
+    DIMS.map((dim) => [dim.key, categoryOrZero(site.p?.[dim.key])]),
+  ) as Profile;
   const row = nasaRecord(site);
-  if (!row) return site.p;
+  if (!row) return base;
   return {
-    ...site.p,
+    ...base,
     frio: frioFromTemperature(row.T2M),
     aridez: aridezFromPrecipitation(row.PRECTOTCORR),
   };
+}
+
+export function categoryKnown(site: Site, key: DimKey): boolean {
+  if ((key === "frio" || key === "aridez") && nasaRecord(site)) return true;
+  return typeof site.p?.[key] === "number";
 }
 
 export function categoryLabel(key: DimKey, site?: Site): "Dato NASA" | "Estimado" {
@@ -82,12 +81,82 @@ export function categoryLabel(key: DimKey, site?: Site): "Dato NASA" | "Estimado
   return "Dato NASA";
 }
 
-export function powerQueryUrl(site: Site): string {
+/** Climatología por punto, comunidad RE. La misma consulta que los sitios conocidos. */
+export function powerPointUrl(lat: number, lng: number): string {
   const url = new URL("https://power.larc.nasa.gov/api/temporal/climatology/point");
   url.searchParams.set("parameters", "T2M,T2M_MAX,T2M_MIN,PRECTOTCORR");
   url.searchParams.set("community", "RE");
-  url.searchParams.set("longitude", String(site.lng));
-  url.searchParams.set("latitude", String(site.lat));
+  url.searchParams.set("longitude", String(lng));
+  url.searchParams.set("latitude", String(lat));
   url.searchParams.set("format", "JSON");
   return url.toString();
+}
+
+export function powerQueryUrl(site: Site): string {
+  return powerPointUrl(site.lat, site.lng);
+}
+
+function pointCacheKey(lat: number, lng: number): string {
+  const round = (value: number) => (Math.round(value * 100) / 100).toFixed(2);
+  return `${round(lat)},${round(lng)}`;
+}
+
+const powerPointCache = new Map<string, PowerSample>();
+
+export function cachedPowerPoint(lat: number, lng: number): PowerSample | undefined {
+  return powerPointCache.get(pointCacheKey(lat, lng));
+}
+
+export function rememberPowerPoint(lat: number, lng: number, sample: PowerSample) {
+  powerPointCache.set(pointCacheKey(lat, lng), sample);
+}
+
+export type PowerSample = {
+  climate: NasaAnnual;
+  /** Metros. NASA POWER lo trae como tercera coordenada del punto. Null si no viene. */
+  elevation: number | null;
+};
+
+function annualValue(parameter: Record<string, { ANN?: number }> | undefined, name: string): number {
+  const value = parameter?.[name]?.ANN;
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= -900) {
+    throw new Error(name);
+  }
+  return value;
+}
+
+/**
+ * Consulta NASA POWER en vivo. La caché usa latitud y longitud redondeadas a 2 decimales.
+ * La elevación sale de geometry.coordinates[2]. Un valor que no es número o es ≤ −900 es un error.
+ */
+export async function fetchPowerPoint(lat: number, lng: number): Promise<PowerSample> {
+  const queryLat = Math.round(lat * 100) / 100;
+  const queryLng = Math.round(lng * 100) / 100;
+  const cached = cachedPowerPoint(queryLat, queryLng);
+  if (cached) return cached;
+  const response = await fetch(powerPointUrl(queryLat, queryLng), {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) throw new Error(String(response.status));
+  const body = (await response.json()) as {
+    geometry?: { coordinates?: number[] };
+    properties?: { parameter?: Record<string, { ANN?: number }> };
+  };
+  const parameter = body.properties?.parameter;
+  const elevation = body.geometry?.coordinates?.[2];
+  if (typeof elevation !== "number" || !Number.isFinite(elevation) || elevation <= -900) {
+    throw new Error("elevation");
+  }
+  const sample: PowerSample = {
+    climate: {
+      T2M: annualValue(parameter, "T2M"),
+      T2M_MAX: annualValue(parameter, "T2M_MAX"),
+      T2M_MIN: annualValue(parameter, "T2M_MIN"),
+      PRECTOTCORR: annualValue(parameter, "PRECTOTCORR"),
+    },
+    elevation,
+  };
+  rememberPowerPoint(queryLat, queryLng, sample);
+  return sample;
 }

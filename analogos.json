@@ -48,7 +48,8 @@
       "Gobierno del Municipio de Chihuahua – Cumbres de Majalca (municipiochihuahua.gob.mx)",
       "INEGI – Carta topográfica Chihuahua H1310, escala 1:250,000",
       "NASA – características del polo sur lunar para Artemis"
-    ]
+    ],
+    "logistica": { "acceso": "", "permisos": "", "temporada": "", "ciudad": "" }
   },
   {
     "id": "sierra-nombre-de-dios",
@@ -101,7 +102,8 @@
       "Atlas de Riesgos del Municipio de Chihuahua 2022 (municipiochihuahua.gob.mx)",
       "Estudio hidrogeológico del Municipio de Chihuahua 2024 – IMPLAN Chihuahua (implanchihuahua.gob.mx)",
       "INEGI – Carta topográfica Chihuahua H1310, escala 1:250,000"
-    ]
+    ],
+    "logistica": { "acceso": "", "permisos": "", "temporada": "", "ciudad": "" }
   },
   {
     "id": "valle-chihuahua-sacramento",
@@ -109,6 +111,155 @@
     "pais": "México",
     "region": "Municipio de Chihuahua, Chihuahua",
     "lat": 28.8,
-    "lon": -106.2
+    "lon": -106.2,
+    "perfil": {
+      "aridez": null,
+      "frio": null,
+      "crateres": null,
+      "volcanico": null,
+      "polvo": null,
+      "hielo": null,
+      "subsuelo": null,
+      "quimica": null,
+      "vida": null
+    },
+    "logistica": { "acceso": "", "permisos": "", "temporada": "", "ciudad": "" }
+  },
+  {
+    "id": "black-point-lava-flow",
+    "nombre": "Black Point Lava Flow",
+    "region": "Arizona",
+    "pais": "Estados Unidos",
+    "lat": 35.6878,
+    "lon": -111.3599,
+    "analogo_de": ["Luna"],
+    "descripcion": "Flujo de lava basáltica negra al norte de Flagstaff que fluyó hacia el este y se acumuló en la orilla del río Little Colorado.",
+    "uso_nasa": "La NASA usó este terreno para simular las condiciones del polo sur de la Luna en las pruebas D-RATS (Desert Research and Technology Studies), con astronautas viviendo y operando un rover presurizado y saliendo a caminatas lunares simuladas.",
+    "perfil": {
+      "aridez": null,
+      "frio": null,
+      "crateres": null,
+      "volcanico": null,
+      "polvo": null,
+      "hielo": null,
+      "subsuelo": null,
+      "quimica": null,
+      "vida": null
+    },
+    "fuentes": [
+      {"nombre": "NASA APPEL – NASA returns to Black Point Lava Flow", "url": "https://appel.nasa.gov/?p=365689"},
+      {"nombre": "Coordenadas: USGS GNIS (Black Point, Coconino County, AZ)", "url": "https://topoquest.com/place/arizona/bench/black-point/1577"}
+    ],
+    "logistica": { "acceso": "", "permisos": "", "temporada": "", "ciudad": "" }
+  },
+  {
+    "id": "cinder-lake-crater-field",
+    "nombre": "Cinder Lake Crater Field",
+    "region": "Arizona",
+    "pais": "Estados Unidos",
+    "lat": 35.3197,
+    "lon": -111.5171,
+    "analogo_de": ["Luna"],
+    "descripcion": "Campo de cráteres artificiales hecho con explosivos sobre ceniza volcánica, al noreste de Flagstaff y al sur del cráter Sunset.",
+    "uso_nasa": "El USGS lo creó para entrenar a los astronautas del Apolo. En 1967 se abrieron 47 cráteres que reproducen a escala 1:1 una parte del Mar de la Tranquilidad, la zona de aterrizaje del Apolo 11.",
+    "perfil": {
+      "aridez": null,
+      "frio": null,
+      "crateres": null,
+      "volcanico": null,
+      "polvo": null,
+      "hielo": null,
+      "subsuelo": null,
+      "quimica": null,
+      "vida": null
+    },
+    "fuentes": [
+      {"nombre": "NASA Science – Arizona's 'Lunar' Craters", "url": "https://science.nasa.gov/?p=908790"},
+      {"nombre": "USGS – Cinder Lake crater field location test (1967)", "url": "https://pubs.usgs.gov/of/1967/0007/report.pdf"},
+      {"nombre": "Coordenadas: USGS GNIS (Cinder Lake, Coconino County, AZ)", "url": "https://topoquest.com/place-detail.php?id=27656"}
+    ],
+    "logistica": { "acceso": "", "permisos": "", "temporada": "", "ciudad": "" }
+  },
+  {
+    "id": "valle-diez-mil-humos",
+    "nombre": "Valle de los Diez Mil Humos",
+    "region": "Alaska",
+    "pais": "Estados Unidos",
+    "lat": 58.3939,
+    "lon": -155.3853,
+    "analogo_de": ["Luna"],
+    "descripcion": "Valle del Parque Nacional Katmai lleno de depósitos de la erupción del Novarupta de 1912, la mayor erupción volcánica del siglo XX.",
+    "uso_nasa": "En 1965 y 1966 la NASA llevó ahí a los astronautas del Apolo para entrenar geología porque el valle es seco, árido, rocoso y volcánico, como un paisaje lunar. En 2024 lo estudió el Goddard Instrument Field Team de la NASA.",
+    "perfil": {
+      "aridez": null,
+      "frio": null,
+      "crateres": null,
+      "volcanico": null,
+      "polvo": null,
+      "hielo": null,
+      "subsuelo": null,
+      "quimica": null,
+      "vida": null
+    },
+    "fuentes": [
+      {"nombre": "NASA Science – Into the Field with NASA: Valley of Ten Thousand Smokes", "url": "https://science.nasa.gov/?p=406852"},
+      {"nombre": "NASA Earth Observatory – Playing the Moon Game", "url": "https://science.nasa.gov/earth/earth-observatory/playing-the-moon-game/"},
+      {"nombre": "NPS – Following in the Footsteps of Astronauts", "url": "https://www.nps.gov/katm/blogs/following-in-the-footsteps-of-astronauts.htm"}
+    ],
+    "logistica": { "acceso": "", "permisos": "", "temporada": "", "ciudad": "" }
+  },
+  {
+    "id": "kilauea-iki",
+    "nombre": "Kīlauea Iki",
+    "region": "Hawái",
+    "pais": "Estados Unidos",
+    "lat": 19.4139,
+    "lon": -155.2464,
+    "analogo_de": ["Marte"],
+    "descripcion": "Cráter junto a la caldera de Kīlauea, en el Parque Nacional de los Volcanes de Hawái.",
+    "uso_nasa": "Sede de la tercera y última temporada del programa BASALT de la NASA (noviembre de 2017), considerado un análogo del Marte primitivo. Ahí se practicaron caminatas espaciales con retraso de comunicación simulado entre la Tierra y Marte.",
+    "perfil": {
+      "aridez": null,
+      "frio": null,
+      "crateres": null,
+      "volcanico": null,
+      "polvo": null,
+      "hielo": null,
+      "subsuelo": null,
+      "quimica": null,
+      "vida": null
+    },
+    "fuentes": [
+      {"nombre": "NASA – What is BASALT?", "url": "https://www.nasa.gov/missions/analog-field-testing/what-is-basalt/"},
+      {"nombre": "NASA – BASALT Hawaii 2017 field deployment", "url": "https://www.nasa.gov/general/basalt-research-program-hawaii-2017-field-deployment/"}
+    ],
+    "logistica": { "acceso": "", "permisos": "", "temporada": "", "ciudad": "" }
+  },
+  {
+    "id": "mauna-ulu",
+    "nombre": "Mauna Ulu",
+    "region": "Hawái",
+    "pais": "Estados Unidos",
+    "lat": 19.3672,
+    "lon": -155.2014,
+    "analogo_de": ["Marte"],
+    "descripcion": "Escudo de lava en la zona del rift este de Kīlauea, formado en la erupción de 1969 a 1974.",
+    "uso_nasa": "En 2016 el programa BASALT de la NASA eligió la región de Mauna Ulu como zona de 'aterrizaje' y exploración en Marte, para estudiar terrenos volcánicos como ambientes análogos al Marte primitivo y actual.",
+    "perfil": {
+      "aridez": null,
+      "frio": null,
+      "crateres": null,
+      "volcanico": null,
+      "polvo": null,
+      "hielo": null,
+      "subsuelo": null,
+      "quimica": null,
+      "vida": null
+    },
+    "fuentes": [
+      {"nombre": "NASA – What is BASALT?", "url": "https://www.nasa.gov/missions/analog-field-testing/what-is-basalt/"},
+      {"nombre": "Hawaii Tribune-Herald – simulación de BASALT en Mauna Ulu (2016)", "url": "https://www.hawaiitribune-herald.com/?p=78604"}
+    ],
+    "logistica": { "acceso": "", "permisos": "", "temporada": "", "ciudad": "" }
   }
 ]
