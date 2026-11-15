@@ -15,8 +15,17 @@ export function initialWeights(): Weights {
   return Object.fromEntries(DIMS.map((d) => [d.key, 1])) as Weights;
 }
 
+/** Promedio de la similitud del expediente (0–5) pasado a 0–100. */
+export function similitudScore(site: Site): number | null {
+  if (!site.similitud) return null;
+  const values = Object.values(site.similitud);
+  if (values.length === 0) return null;
+  return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 20);
+}
+
 /** Similitud = 100 × (1 − diferencia promedio ponderada / 10). */
 export function scoreSite(site: Site, target: Target, weights: Weights): number {
+  if (!site.p) return similitudScore(site) ?? 0;
   const earth = earthProfile(site);
   let sumW = 0;
   let sumD = 0;
@@ -36,6 +45,7 @@ export function scoreColor(score: number): string {
 }
 
 export function dimensionDiffs(site: Site, target: Target, weights: Weights): DimDiff[] {
+  if (!site.p) return [];
   const earth = earthProfile(site);
   return DIMS.filter((d) => weights[d.key] > 0).map((d) => ({
     key: d.key,

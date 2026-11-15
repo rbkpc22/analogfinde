@@ -51,8 +51,21 @@ export function aridezFromPrecipitation(mmPerDay: number): number {
   return scaleScore((10 * (4 - mmPerDay)) / 3.8);
 }
 
+const EMPTY_PROFILE: Profile = {
+  aridez: 0,
+  frio: 0,
+  crateres: 0,
+  volcanico: 0,
+  polvo: 0,
+  hielo: 0,
+  subsuelo: 0,
+  quimica: 0,
+  vida: 0,
+};
+
 /** Perfil del lugar: frío y aridez salen de NASA POWER; el resto conserva la estimación. */
 export function earthProfile(site: Site): Profile {
+  if (!site.p) return EMPTY_PROFILE;
   const row = nasaRecord(site);
   if (!row) return site.p;
   return {

@@ -1,0 +1,114 @@
+[
+  {
+    "id": "cumbres-de-majalca",
+    "nombre": "Parque Nacional Cumbres de Majalca",
+    "pais": "México",
+    "region": "Municipio de Chihuahua, Chihuahua",
+    "lat": 28.8042,
+    "lon": -106.485,
+    "analogo_de": ["Luna"],
+    "estado": "candidato",
+    "tipo_analogo": "Análogo lunar potencial (relieve y movilidad)",
+    "ubicacion": "Noroeste de la ciudad de Chihuahua, en la Sierra de Majalca (parte de la Sierra Madre Occidental).",
+    "altitud": "Aproximadamente 1,760 a 2,300 m sobre el nivel del mar",
+    "tipo_terreno": "Sierra con formaciones rocosas erosionadas, pendientes fuertes y cañadas",
+    "descripcion": "Presenta formaciones rocosas, variaciones topográficas pronunciadas, pendientes fuertes y procesos de erosión. La CONANP documenta su relieve accidentado y sus formaciones rocosas.",
+    "geologia": [
+      "Formaciones rocosas de origen volcánico moldeadas por erosión de viento y agua",
+      "Relieve accidentado con pendientes fuertes",
+      "Elevaciones y depresiones marcadas"
+    ],
+    "comparacion": {
+      "lugar": "Región del polo sur lunar (zona del cráter Shackleton, objetivo de Artemis)",
+      "explicacion": "El polo sur lunar tiene terrenos irregulares, pendientes pronunciadas, elevaciones y depresiones, y grandes diferencias de iluminación provocadas por el relieve. La NASA identifica estas características como algunos de los principales obstáculos para la movilidad y operación de equipos lunares. Majalca permite practicar en un relieve parecido."
+    },
+    "pruebas": [
+      "Navegación de vehículos exploradores (rovers)",
+      "Sistemas de detección de obstáculos",
+      "Cartografía y reconocimiento del terreno",
+      "Evaluación de movilidad en superficies rocosas",
+      "Pruebas de sensores de pendiente y estabilidad"
+    ],
+    "limitaciones": [
+      "Tiene bosques de pino y encino y vegetación",
+      "Clima terrestre: no reproduce las temperaturas extremas del polo sur lunar",
+      "No tiene las sombras permanentes de los cráteres lunares",
+      "Es un parque nacional protegido: cualquier prueba física requiere autorización"
+    ],
+    "verificacion_nasa": [
+      { "recurso": "LRO / LOLA", "uso": "Comparar elevación, pendientes y relieve del polo sur lunar" },
+      { "recurso": "LRO Diviner", "uso": "Comparar temperaturas superficiales y regiones polares lunares" },
+      { "recurso": "NASA Earthdata Search / Worldview", "uso": "Obtener imágenes satelitales y elevación de Majalca" },
+      { "recurso": "JAXA G-Portal", "uso": "Datos de elevación de la Tierra" }
+    ],
+    "similitud": { "terreno": 4, "suelo": 2, "clima": 2, "vida": 0, "aislamiento": 2 },
+    "proyectos_recomendados": ["rover", "sensores de navegación", "detección de obstáculos"],
+    "fuentes": [
+      "CONANP – Programa de Manejo del Parque Nacional Cumbres de Majalca",
+      "Gobierno del Municipio de Chihuahua – Cumbres de Majalca (municipiochihuahua.gob.mx)",
+      "INEGI – Carta topográfica Chihuahua H1310, escala 1:250,000",
+      "NASA – características del polo sur lunar para Artemis"
+    ]
+  },
+  {
+    "id": "sierra-nombre-de-dios",
+    "nombre": "Sierra de Nombre de Dios",
+    "pais": "México",
+    "region": "Municipio de Chihuahua, Chihuahua",
+    "lat": 28.7092,
+    "lon": -106.0769,
+    "analogo_de": ["Luna", "Marte"],
+    "estado": "candidato",
+    "tipo_analogo": "Análogo geológico potencial (rocas volcánicas y fracturadas)",
+    "ubicacion": "Al este y noreste de la ciudad de Chihuahua; la coordenada es la entrada de las Grutas de Nombre de Dios, en el Cerro del Caballo.",
+    "altitud": "Aproximadamente 1,400 a 1,800 m sobre el nivel del mar",
+    "tipo_terreno": "Sierra con rocas volcánicas (ignimbritas) y calizas",
+    "descripcion": "El Atlas de Riesgos del Municipio de Chihuahua describe formaciones ignimbríticas y calcáreas en esta sierra, y estructuras intrusivas en el Cerro de La Gloria. El estudio hidrogeológico municipal identifica varios tipos de roca volcánica y sedimentaria.",
+    "geologia": [
+      "Ignimbritas (rocas formadas por nubes ardientes de ceniza volcánica)",
+      "Tobas riolíticas del Terciario",
+      "Derrames lávicos andesíticos",
+      "Flujos de origen máfico en el suroeste del acuífero",
+      "Rocas calcáreas (calizas) del Cretácico",
+      "Estructuras intrusivas en el Cerro de La Gloria"
+    ],
+    "comparacion": {
+      "lugar": "Terrenos rocosos y volcánicos de la Luna y de Marte",
+      "explicacion": "La analogía es principalmente geológica y de terreno rocoso, no una equivalencia exacta con la composición del regolito lunar. Para Marte sirve para estudiar materiales volcánicos y procesos de alteración de rocas, siempre que se compruebe la mineralogía con imágenes y datos espectrales."
+    },
+    "pruebas": [
+      "Evaluación de instrumentos de análisis geológico",
+      "Reconocimiento de rocas y fracturas",
+      "Pruebas de movilidad de vehículos robóticos",
+      "Evaluación de sistemas de muestreo superficial",
+      "Cartografía de terrenos rocosos"
+    ],
+    "limitaciones": [
+      "Está junto a la ciudad, así que no hay aislamiento",
+      "La composición de las rocas no es igual al regolito lunar",
+      "Hay vegetación de desierto y atmósfera terrestre",
+      "Falta confirmar la mineralogía con datos espectrales"
+    ],
+    "verificacion_nasa": [
+      { "recurso": "NASA Planetary Data System (PDS) – Geosciences Node", "uso": "Comparar con datos de rocas y minerales de la Luna y Marte" },
+      { "recurso": "LRO / LOLA", "uso": "Comparar relieve con terrenos rocosos lunares" },
+      { "recurso": "Copernicus Sentinel", "uso": "Imágenes y radar de la sierra" },
+      { "recurso": "RADARSAT", "uso": "Analizar la rugosidad de la superficie con radar" }
+    ],
+    "similitud": { "terreno": 3, "suelo": 3, "clima": 3, "vida": 0, "aislamiento": 1 },
+    "proyectos_recomendados": ["instrumentos científicos", "herramientas de geología", "rover", "muestreo"],
+    "fuentes": [
+      "Atlas de Riesgos del Municipio de Chihuahua 2022 (municipiochihuahua.gob.mx)",
+      "Estudio hidrogeológico del Municipio de Chihuahua 2024 – IMPLAN Chihuahua (implanchihuahua.gob.mx)",
+      "INEGI – Carta topográfica Chihuahua H1310, escala 1:250,000"
+    ]
+  },
+  {
+    "id": "valle-chihuahua-sacramento",
+    "nombre": "Valle de Chihuahua-Sacramento",
+    "pais": "México",
+    "region": "Municipio de Chihuahua, Chihuahua",
+    "lat": 28.8,
+    "lon": -106.2
+  }
+]

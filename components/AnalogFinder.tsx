@@ -246,7 +246,7 @@ export default function AnalogFinder() {
             onSelect={selectSite}
           />
           <div className="pointer-events-none absolute inset-0 z-[400] shadow-[inset_0_0_90px_rgba(7,11,20,0.5)]" />
-          <div className="pointer-events-none absolute top-3 left-3 z-[500] max-w-[min(68%,280px)] rounded-2xl border border-line/80 bg-canvas/80 px-3 py-2 backdrop-blur-md max-[640px]:max-w-[calc(100%-4.25rem)] max-[640px]:px-2.5 max-[640px]:py-1.5">
+          <div className="pointer-events-none absolute top-3 left-3 z-[500] max-w-[min(68%,280px)] rounded-2xl border border-line/80 bg-canvas/80 px-3 py-2 backdrop-blur-md max-[640px]:max-w-[58%] max-[640px]:px-2.5 max-[640px]:py-1.5">
             <p className="font-mono text-[10px] tracking-[0.16em] text-muted uppercase">Objetivo</p>
             <p className="text-sm leading-snug font-semibold max-[640px]:text-xs">{target.name}</p>
             <span
@@ -304,7 +304,11 @@ export default function AnalogFinder() {
                     <span className="font-mono text-[11px] text-muted">{index + 1}</span>
                     <span className="min-w-0 leading-snug">
                       {site.name}
-                      {site.nuevo ? (
+                      {site.estado === "candidato" ? (
+                        <span className="ml-1.5 inline-block rounded-full border border-accent/70 px-1.5 py-px align-middle text-[9px] font-bold tracking-wide text-accent uppercase">
+                          Candidato
+                        </span>
+                      ) : site.nuevo ? (
                         <span className="ml-1.5 inline-block rounded-full bg-accent px-1.5 py-px align-middle text-[9px] font-bold text-[#111]">
                           NUEVO
                         </span>
@@ -353,9 +357,27 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
       className="rise rounded-2xl border border-line bg-panel-2 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.22)]"
     >
       <h3 className="font-display text-lg leading-tight font-semibold">{site.name}</h3>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {site.estado === "candidato" ? (
+          <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#111] uppercase">
+            Candidato
+          </span>
+        ) : null}
+        {site.analogoDe?.map((body) => (
+          <span
+            key={body}
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#111] ${
+              body.toLowerCase() === "marte" ? "bg-mars" : "bg-moon"
+            }`}
+          >
+            {body}
+          </span>
+        ))}
+      </div>
+      {site.tipoAnalogo ? <p className="mt-2 text-sm text-muted">{site.tipoAnalogo}</p> : null}
       <p className="mt-1 text-xs text-muted">
         {site.where}
-        {site.nuevo ? " · poco estudiado como análogo" : ""}
+        {site.nuevo && site.estado !== "candidato" ? " · poco estudiado como análogo" : ""}
       </p>
       <p className="mt-3 flex flex-wrap items-end gap-x-2 gap-y-1">
         <span
@@ -366,79 +388,188 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
         </span>
         <span className="pb-1 text-sm text-muted">/ 100 de parecido con {target.name}</span>
       </p>
-      <p className="mt-3 text-sm leading-relaxed">{site.desc}</p>
+      {!site.p && site.similitud ? (
+        <p className="mt-2 text-[11px] leading-relaxed text-muted">
+          Este puntaje es el promedio de la similitud del expediente (terreno, suelo, clima, vida y
+          aislamiento). Todavía no usa las 9 categorías con peso.
+        </p>
+      ) : null}
 
-      <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Se parece en</h4>
-      <ul className="ok-list">
-        {parecidos.length > 0 ? (
-          parecidos.map((item) => (
-            <li key={item.key}>
-              {item.name} <SourceTag dim={item.key} site={site} />
-            </li>
-          ))
-        ) : (
-          <li>Ninguna categoría muy cercana</li>
-        )}
-      </ul>
+      {site.desc ? <p className="mt-3 text-sm leading-relaxed">{site.desc}</p> : null}
 
-      <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-        Dónde falla la analogía
-      </h4>
-      <ul className="fail-list">
-        {fallas.map((item) => (
-          <li key={item.key}>
-            {item.name} <SourceTag dim={item.key} site={site} />:{" "}
-            {item.earth > item.target ? "mucho más" : "mucho menos"} que en {cuerpo}
-          </li>
-        ))}
-        <li>{LIMITES[target.body]}</li>
-      </ul>
+      <Dossier site={site} />
 
-      <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-        Qué se podría probar aquí
-      </h4>
-      <p className="mt-1 text-sm leading-relaxed">{site.prueba}</p>
+      {diffs.length > 0 ? (
+        <>
+          <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Se parece en</h4>
+          <ul className="ok-list">
+            {parecidos.length > 0 ? (
+              parecidos.map((item) => (
+                <li key={item.key}>
+                  {item.name} <SourceTag dim={item.key} site={site} />
+                </li>
+              ))
+            ) : (
+              <li>Ninguna categoría muy cercana</li>
+            )}
+          </ul>
+
+          <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+            Dónde falla la analogía
+          </h4>
+          <ul className="fail-list">
+            {fallas.map((item) => (
+              <li key={item.key}>
+                {item.name} <SourceTag dim={item.key} site={site} />:{" "}
+                {item.earth > item.target ? "mucho más" : "mucho menos"} que en {cuerpo}
+              </li>
+            ))}
+            <li>{LIMITES[target.body]}</li>
+          </ul>
+        </>
+      ) : null}
+
+      {site.pruebas && site.pruebas.length > 0 ? null : site.prueba ? (
+        <>
+          <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+            Qué se podría probar aquí
+          </h4>
+          <p className="mt-1 text-sm leading-relaxed">{site.prueba}</p>
+        </>
+      ) : null}
 
       <NasaPower site={site} />
 
-      <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-        Comparación por categoría
-      </h4>
-      <div className="mt-2 space-y-2.5">
-        {diffs.map((item) => (
-          <div key={item.key}>
-            <div className="flex justify-between gap-3 text-[11px] text-muted">
-              <span>
-                {item.name} <SourceTag dim={item.key} site={site} />
-              </span>
-              <span className="font-mono">
-                {item.earth} vs {item.target}
-              </span>
-            </div>
-            <div className="relative mt-1 h-2 rounded-full bg-canvas">
-              <div
-                className="absolute top-0 left-0 h-2 rounded-full bg-earth"
-                style={{ width: `${item.earth * 10}%` }}
-              />
-              <div
-                className="absolute -top-[3px] h-3.5 w-[3px] rounded-sm bg-accent"
-                style={{ left: `calc(${item.target * 10}% - 1px)` }}
-              />
-            </div>
+      {diffs.length > 0 ? (
+        <>
+          <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+            Comparación por categoría
+          </h4>
+          <div className="mt-2 space-y-2.5">
+            {diffs.map((item) => (
+              <div key={item.key}>
+                <div className="flex justify-between gap-3 text-[11px] text-muted">
+                  <span>
+                    {item.name} <SourceTag dim={item.key} site={site} />
+                  </span>
+                  <span className="font-mono">
+                    {item.earth} vs {item.target}
+                  </span>
+                </div>
+                <div className="relative mt-1 h-2 rounded-full bg-canvas">
+                  <div
+                    className="absolute top-0 left-0 h-2 rounded-full bg-earth"
+                    style={{ width: `${item.earth * 10}%` }}
+                  />
+                  <div
+                    className="absolute -top-[3px] h-3.5 w-[3px] rounded-sm bg-accent"
+                    style={{ left: `calc(${item.target * 10}% - 1px)` }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <div className="mt-2 flex gap-3 text-[11px] text-muted">
-        <span className="inline-flex items-center gap-1.5">
-          <i className="inline-block h-2 w-2.5 rounded-sm bg-earth" />
-          Tierra
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <i className="inline-block h-2 w-2.5 rounded-sm bg-accent" />
-          {bodyLabel(target.body)}
-        </span>
-      </div>
+          <div className="mt-2 flex gap-3 text-[11px] text-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <i className="inline-block h-2 w-2.5 rounded-sm bg-earth" />
+              Tierra
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <i className="inline-block h-2 w-2.5 rounded-sm bg-accent" />
+              {bodyLabel(target.body)}
+            </span>
+          </div>
+        </>
+      ) : null}
     </article>
+  );
+}
+
+function Dossier({ site }: { site: Site }) {
+  const hasFacts = site.altitud || site.ubicacion || site.tipoTerreno;
+  if (
+    !hasFacts &&
+    !site.geologia?.length &&
+    !site.comparacion &&
+    !site.pruebas?.length &&
+    !site.limitaciones?.length &&
+    !site.verificacionNasa?.length &&
+    !site.fuentes?.length &&
+    !site.proyectos?.length
+  ) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 space-y-4">
+      {hasFacts ? (
+        <dl className="grid gap-2 text-sm">
+          {site.altitud ? (
+            <div>
+              <dt className="text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">Altitud</dt>
+              <dd className="mt-0.5 leading-relaxed">{site.altitud}</dd>
+            </div>
+          ) : null}
+          {site.ubicacion ? (
+            <div>
+              <dt className="text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">Ubicación</dt>
+              <dd className="mt-0.5 leading-relaxed">{site.ubicacion}</dd>
+            </div>
+          ) : null}
+          {site.tipoTerreno ? (
+            <div>
+              <dt className="text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">Tipo de terreno</dt>
+              <dd className="mt-0.5 leading-relaxed">{site.tipoTerreno}</dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+
+      <FactList title="Geología" items={site.geologia} />
+
+      {site.comparacion ? (
+        <section>
+          <h4 className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Comparación</h4>
+          <p className="mt-1 text-sm font-semibold">{site.comparacion.lugar}</p>
+          <p className="mt-1 text-sm leading-relaxed">{site.comparacion.explicacion}</p>
+        </section>
+      ) : null}
+
+      <FactList title="Pruebas que permite" items={site.pruebas} />
+      <FactList title="Limitaciones" items={site.limitaciones} />
+
+      {site.verificacionNasa && site.verificacionNasa.length > 0 ? (
+        <section>
+          <h4 className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+            Cómo verificarlo con datos de NASA
+          </h4>
+          <ul className="mt-1 space-y-1.5 text-sm leading-relaxed">
+            {site.verificacionNasa.map((item) => (
+              <li key={item.recurso}>
+                <span className="font-semibold">{item.recurso}.</span> {item.uso}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <FactList title="Fuentes" items={site.fuentes} />
+      <FactList title="Proyectos recomendados" items={site.proyectos} />
+    </div>
+  );
+}
+
+function FactList({ title, items }: { title: string; items?: string[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <section>
+      <h4 className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">{title}</h4>
+      <ul className="mt-1 list-disc space-y-1 pl-4 text-sm leading-relaxed">
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

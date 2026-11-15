@@ -1,5 +1,7 @@
 /** Datos extraídos del prototipo (referencia/index.html). Sin valores inventados. */
 
+import analogRecords from "../analogos.json";
+
 export type DimKey =
   | "aridez"
   | "frio"
@@ -28,15 +30,49 @@ export type Target = {
   p: Profile;
 };
 
+export type Similitud = {
+  terreno: number;
+  suelo: number;
+  clima: number;
+  vida: number;
+  aislamiento: number;
+};
+
+export type Comparacion = {
+  lugar: string;
+  explicacion: string;
+};
+
+export type VerificacionNasa = {
+  recurso: string;
+  uso: string;
+};
+
 export type Site = {
   name: string;
   where: string;
   lat: number;
   lng: number;
   nuevo: boolean;
-  p: Profile;
+  /** Perfil 0–10 de las 9 categorías. Los expedientes nuevos pueden no traerlo. */
+  p?: Profile;
   desc: string;
   prueba: string;
+  id?: string;
+  estado?: string;
+  tipoAnalogo?: string;
+  analogoDe?: string[];
+  ubicacion?: string;
+  altitud?: string;
+  tipoTerreno?: string;
+  geologia?: string[];
+  comparacion?: Comparacion;
+  pruebas?: string[];
+  limitaciones?: string[];
+  verificacionNasa?: VerificacionNasa[];
+  fuentes?: string[];
+  proyectos?: string[];
+  similitud?: Similitud;
 };
 
 export const DIMS: Dimension[] = [
@@ -139,7 +175,7 @@ export const TARGETS: Target[] = [
   },
 ];
 
-export const SITES: Site[] = [
+const CORE_SITES: Site[] = [
   {
     name: "Médanos de Samalayuca",
     where: "Chihuahua, México",
@@ -521,6 +557,69 @@ export const SITES: Site[] = [
     prueba: "Caminatas de exploración, comunicaciones y geología volcánica.",
   },
 ];
+
+type AnalogRecord = {
+  id: string;
+  nombre: string;
+  pais: string;
+  region: string;
+  lat: number;
+  lon: number;
+  analogo_de?: string[];
+  estado?: string;
+  tipo_analogo?: string;
+  ubicacion?: string;
+  altitud?: string;
+  tipo_terreno?: string;
+  descripcion?: string;
+  geologia?: string[];
+  comparacion?: { lugar: string; explicacion: string };
+  pruebas?: string[];
+  limitaciones?: string[];
+  verificacion_nasa?: { recurso: string; uso: string }[];
+  similitud?: Similitud;
+  proyectos_recomendados?: string[];
+  fuentes?: string[];
+};
+
+function analogToSite(record: AnalogRecord): Site {
+  return {
+    id: record.id,
+    name: record.nombre,
+    where: `${record.region}, ${record.pais}`,
+    lat: record.lat,
+    lng: record.lon,
+    nuevo: record.estado === "candidato",
+    desc: record.descripcion ?? "",
+    prueba: record.pruebas?.join(" ") ?? "",
+    estado: record.estado,
+    tipoAnalogo: record.tipo_analogo,
+    analogoDe: record.analogo_de,
+    ubicacion: record.ubicacion,
+    altitud: record.altitud,
+    tipoTerreno: record.tipo_terreno,
+    geologia: record.geologia,
+    comparacion: record.comparacion,
+    pruebas: record.pruebas,
+    limitaciones: record.limitaciones,
+    verificacionNasa: record.verificacion_nasa,
+    fuentes: record.fuentes,
+    proyectos: record.proyectos_recomendados,
+    similitud: record.similitud,
+  };
+}
+
+function withAnalogs(sites: Site[], records: AnalogRecord[]): Site[] {
+  const extras = records.map(analogToSite);
+  const replaced = sites.map((site) => {
+    const match = extras.find((item) => item.id === site.id || item.name === site.name);
+    return match ? { ...site, ...match, p: match.p ?? site.p } : site;
+  });
+  const known = new Set(sites.map((site) => site.name));
+  return [...replaced, ...extras.filter((site) => !known.has(site.name))];
+}
+
+export const SITES: Site[] = withAnalogs(CORE_SITES, analogRecords as AnalogRecord[]);
 
 export const LIMITES: Record<Body, string> = {
   luna: "Gravedad 1/6 de la Tierra, vacío total, sin campo magnético (radiación directa) y noches de unos 14 días.",
