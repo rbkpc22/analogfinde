@@ -10,26 +10,29 @@ import {
   analogyLists,
   dimensionDiffs,
   initialWeights,
-  scoreColor,
   scoreSite,
   type Weights,
 } from "@/lib/score";
 import type { FlyTarget } from "@/lib/view";
 
-function bodyLabel(body: Target["body"], upper = false) {
-  if (body === "luna") return upper ? "LUNA" : "Luna";
-  return upper ? "MARTE" : "Marte";
+function BodyTag({ body }: { body: string }) {
+  const mars = body.toLowerCase().startsWith("mar");
+  return (
+    <span className="kicker inline-flex items-center gap-1.5 text-ink">
+      <i
+        className="inline-block h-1.5 w-1.5 shrink-0"
+        style={{ background: mars ? "var(--marte)" : "var(--luna)" }}
+      />
+      {mars ? "MARTE" : "LUNA"}
+    </span>
+  );
 }
 
 function SourceTag({ dim, site }: { dim: DimKey; site?: Site }) {
   const nasa = categoryLabel(dim, site) === "Dato NASA";
   return (
-    <span
-      className={`inline-block rounded-full px-1.5 py-px align-middle text-[9px] font-semibold tracking-wide ${
-        nasa ? "bg-earth/15 text-earth" : "bg-line text-muted"
-      }`}
-    >
-      {nasa ? "Dato NASA" : "Estimado"}
+    <span className={`kicker mt-0.5 block w-fit whitespace-nowrap ${nasa ? "text-accent" : "text-muted"}`}>
+      {nasa ? "▲ Dato NASA" : "~ Estimado"}
     </span>
   );
 }
@@ -39,13 +42,35 @@ function measure(value: number, unit: string) {
 }
 
 function Mark() {
+  return <img src="/logo.png?v=2" alt="" width={56} height={56} className="h-14 w-14 shrink-0" />;
+}
+
+function scoreInk(score: number) {
+  return 0.3 + (0.7 * Math.max(0, Math.min(100, score))) / 100;
+}
+
+function CountUp({ value }: { value: number }) {
+  const [shown, setShown] = useState(0);
+
+  useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setShown(value);
+      return;
+    }
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / 600);
+      setShown(Math.round(value * progress));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+
   return (
-    <svg viewBox="0 0 40 40" className="h-10 w-10 shrink-0" aria-hidden="true">
-      <circle cx="20" cy="20" r="18" fill="#121829" stroke="#27314d" />
-      <circle cx="16" cy="21" r="7" fill="#C9D1E6" />
-      <circle cx="26" cy="16" r="4.5" fill="#E0703A" />
-      <circle cx="30" cy="10" r="1.3" fill="#E9F542" />
-    </svg>
+    <span className="display text-[72px] leading-none text-accent tabular-nums">{shown}</span>
   );
 }
 
@@ -118,50 +143,45 @@ export default function AnalogFinder() {
   }, [selectedName]);
 
   return (
-    <div className="starfield flex h-dvh flex-col overflow-hidden max-[1000px]:h-auto max-[1000px]:min-h-dvh max-[1000px]:overflow-x-hidden max-[1000px]:overflow-y-visible">
-      <header className="relative z-20 border-b border-line/80 bg-[#0e1322]/92 backdrop-blur-md">
+    <div
+      className="starfield flex h-dvh flex-col overflow-hidden max-[1000px]:h-auto max-[1000px]:min-h-dvh max-[1000px]:overflow-x-hidden max-[1000px]:overflow-y-visible"
+      style={{ "--accent": target.body === "luna" ? "#E6EEF5" : "#FF5A1F" } as React.CSSProperties}
+    >
+      <header className="relative z-20 border-b border-line bg-panel/95">
         <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <Mark />
               <div className="min-w-0">
-                <p className="truncate font-mono text-[10px] tracking-[0.18em] text-accent uppercase sm:tracking-[0.22em]">
-                  NASA Space Apps Challenge 2026
-                </p>
-                <h1 className="font-display text-2xl leading-none font-semibold tracking-tight">
-                  Analog<span className="text-accent">Finder</span>
-                </h1>
+                <p className="kicker truncate text-muted">NASA Space Apps Challenge 2026</p>
+                <h1 className="display text-2xl leading-none">AnalogFinder</h1>
               </div>
             </div>
             <button
               ref={aboutButtonRef}
               type="button"
               onClick={() => setAboutOpen(true)}
-              className="shrink-0 rounded-full border border-line px-3 py-2 text-xs font-medium text-ink transition hover:border-accent hover:text-accent sm:text-sm"
+              className="kicker shrink-0 border border-line px-3 py-2 text-ink transition hover:border-accent hover:text-accent"
             >
               Acerca del proyecto
             </button>
           </div>
           <div className="lg:max-w-md lg:text-right">
-            <p className="font-mono text-[10px] tracking-[0.18em] text-muted uppercase">
-              Centro de control de misión
-            </p>
+            <p className="kicker text-muted">Centro de control de misión</p>
             <p className="text-sm text-muted">
               ¿Qué lugar de la Tierra se parece más a la Luna o a Marte… y en qué no?
             </p>
           </div>
         </div>
-        <div className="h-px bg-gradient-to-r from-transparent via-accent/80 to-transparent" />
+        <div className="h-px bg-accent" />
       </header>
 
       <div className="relative z-10 grid min-h-0 flex-1 grid-cols-1 min-[1001px]:grid-cols-[minmax(280px,340px)_minmax(0,1fr)_minmax(300px,400px)]">
         <aside className="scroll-thin border-line/80 bg-panel/88 min-[1001px]:overflow-y-auto min-[1001px]:border-r">
           <div className="space-y-5 p-4 sm:p-5">
             <section>
-              <h2 className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-                1 · Elige un objetivo
-              </h2>
-              <div className="grid gap-2">
+              <h2 className="display mb-2 text-2xl text-muted">1 · Elige un objetivo</h2>
+              <div className="border-t border-line">
                 {TARGETS.map((item) => {
                   const active = item.id === target.id;
                   return (
@@ -170,20 +190,12 @@ export default function AnalogFinder() {
                       type="button"
                       aria-pressed={active}
                       onClick={() => setTargetId(item.id)}
-                      className={`rounded-xl border bg-panel-2 px-3 py-2.5 text-left transition duration-200 ${
-                        active
-                          ? "border-accent shadow-[inset_0_0_0_1px_#e9f542,0_0_24px_rgba(233,245,66,0.08)]"
-                          : "border-line hover:border-muted/50"
+                      className={`block w-full border-b border-line px-2 py-2.5 text-left ${
+                        active ? "border-l-2 border-l-accent bg-white/[0.03]" : "hover:bg-white/[0.03]"
                       }`}
                     >
-                      <span
-                        className={`mr-1.5 inline-block rounded-full px-1.5 py-px text-[10px] font-semibold text-[#111] ${
-                          item.body === "luna" ? "bg-moon" : "bg-mars"
-                        }`}
-                      >
-                        {bodyLabel(item.body, true)}
-                      </span>
-                      <span className="text-sm">{item.name}</span>
+                      <BodyTag body={item.body} />
+                      <span className="mt-1 block text-sm">{item.name}</span>
                       <small className="mt-0.5 block text-[11px] text-muted">{item.sub}</small>
                     </button>
                   );
@@ -192,14 +204,12 @@ export default function AnalogFinder() {
             </section>
 
             <section>
-              <h2 className="mb-1 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-                2 · ¿Qué te importa más?
-              </h2>
+              <h2 className="display mb-1 text-2xl text-muted">2 · ¿Qué te importa más?</h2>
               <p className="mb-2 text-[11px] text-muted">0 ignora la categoría · 3 la prioriza</p>
               <div className="space-y-2.5">
                 {DIMS.map((dim) => (
                   <label key={dim.key} className="grid grid-cols-[minmax(0,1fr)_92px_1.4rem] items-center gap-2 text-xs">
-                    <span className="leading-tight">
+                    <span className="block leading-tight">
                       {dim.name} <SourceTag dim={dim.key} />
                     </span>
                     <input
@@ -214,7 +224,7 @@ export default function AnalogFinder() {
                         setWeights((current) => ({ ...current, [dim.key]: value }));
                       }}
                     />
-                    <b className="text-right font-mono text-sm text-accent">{weights[dim.key]}</b>
+                    <b className="text-right font-mono text-sm text-accent tabular-nums">{weights[dim.key]}</b>
                   </label>
                 ))}
               </div>
@@ -238,85 +248,79 @@ export default function AnalogFinder() {
           </div>
         </aside>
 
-        <section className="relative h-[52vh] min-h-[280px] border-line/80 min-[1001px]:h-full min-[1001px]:min-h-0 max-[1000px]:border-y sm:h-[58vh] sm:min-h-[320px]">
+        <section
+          className={
+            showWelcome
+              ? "fixed top-0 left-0 z-[60] h-dvh w-screen md:left-[20vw]"
+              : "relative h-[52vh] min-h-[280px] border-line/80 min-[1001px]:h-full min-[1001px]:min-h-0 max-[1000px]:border-y sm:h-[58vh] sm:min-h-[320px]"
+          }
+        >
           <AnalogMap
             sites={mapSites}
             selectedName={selectedName}
             flyTarget={flyTarget}
+            accent={target.body === "luna" ? "#E6EEF5" : "#FF5A1F"}
             onSelect={selectSite}
           />
-          <div className="pointer-events-none absolute inset-0 z-[400] shadow-[inset_0_0_90px_rgba(7,11,20,0.5)]" />
-          <div className="pointer-events-none absolute top-3 left-3 z-[500] max-w-[min(68%,280px)] rounded-2xl border border-line/80 bg-canvas/80 px-3 py-2 backdrop-blur-md max-[640px]:max-w-[58%] max-[640px]:px-2.5 max-[640px]:py-1.5">
-            <p className="font-mono text-[10px] tracking-[0.16em] text-muted uppercase">Objetivo</p>
-            <p className="text-sm leading-snug font-semibold max-[640px]:text-xs">{target.name}</p>
-            <span
-              className={`mt-1 inline-block rounded-full px-1.5 py-px text-[10px] font-semibold text-[#111] ${
-                target.body === "luna" ? "bg-moon" : "bg-mars"
-              }`}
-            >
-              {bodyLabel(target.body, true)}
+          <div className="pointer-events-none absolute inset-0 z-[400]" />
+          <div className="brackets pointer-events-none absolute top-3 left-3 z-[500] max-w-[min(68%,280px)] border border-line bg-panel/90 px-3 py-2 max-[640px]:max-w-[58%] max-[640px]:px-2.5 max-[640px]:py-1.5">
+            <p className="kicker text-muted">Objetivo</p>
+            <p className="text-sm leading-snug font-medium max-[640px]:text-xs">{target.name}</p>
+            <span className="mt-1 inline-flex">
+              <BodyTag body={target.body} />
             </span>
           </div>
-          <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-2xl border border-line/80 bg-canvas/80 px-3 py-2 text-[11px] text-muted backdrop-blur-md max-[640px]:right-3 max-[640px]:bottom-7 max-[640px]:px-2.5 max-[640px]:py-1.5">
-            <p className="mb-1 font-mono text-[10px] tracking-[0.14em] uppercase max-[640px]:sr-only">Puntaje</p>
-            <ul className="space-y-1 max-[640px]:grid max-[640px]:grid-cols-2 max-[640px]:gap-x-3 max-[640px]:gap-y-1 max-[640px]:space-y-0">
-              <li className="flex items-center gap-2">
-                <i className="inline-block h-2.5 w-2.5 rounded-full bg-ok" /> ≥ 80 muy parecido
-              </li>
-              <li className="flex items-center gap-2">
-                <i className="inline-block h-2.5 w-2.5 rounded-full bg-accent" /> ≥ 65 parecido
-              </li>
-              <li className="flex items-center gap-2">
-                <i className="inline-block h-2.5 w-2.5 rounded-full bg-[#f5a142]" /> ≥ 50 parcial
-              </li>
-              <li className="flex items-center gap-2">
-                <i className="inline-block h-2.5 w-2.5 rounded-full bg-bad" /> &lt; 50 bajo
-              </li>
-            </ul>
-            <p className="mt-1.5 text-[10px] max-[640px]:hidden">El tamaño sigue el puntaje</p>
+          <div className="brackets pointer-events-none absolute bottom-10 left-3 z-[500] w-44 border border-line bg-panel/90 px-3 py-2 max-[640px]:right-auto max-[640px]:bottom-9 max-[640px]:w-36 max-[640px]:px-2.5">
+            <p className="kicker mb-2 text-muted">Puntaje</p>
+            <div
+              className="h-1.5 w-full"
+              style={{
+                background: "linear-gradient(90deg, color-mix(in srgb, var(--accent) 30%, transparent), var(--accent))",
+              }}
+            />
+            <div className="relative mt-1 h-4 font-mono text-[11px] text-muted tabular-nums">
+              <span className="absolute left-0">0</span>
+              <span className="absolute left-1/2 -translate-x-1/2">50</span>
+              <span className="absolute left-[80%] -translate-x-1/2">80</span>
+              <span className="absolute right-0">100</span>
+            </div>
           </div>
         </section>
 
         <aside className="scroll-thin flex min-h-0 flex-col bg-panel/88 min-[1001px]:h-full min-[1001px]:overflow-hidden min-[1001px]:border-l min-[1001px]:border-line/80">
           <div className="px-4 pt-4 sm:px-5">
             <div className="mb-2 flex items-end justify-between gap-3">
-              <h2 className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-                Lugares más parecidos
-              </h2>
-              <p className="font-mono text-[11px] text-muted">
+              <h2 className="display text-2xl text-muted">Lugares más parecidos</h2>
+              <p className="font-mono text-[11px] text-muted tabular-nums">
                 {ranked.length} de {SITES.length}
               </p>
             </div>
           </div>
-          <ol className="scroll-thin max-h-72 space-y-0.5 overflow-y-auto px-3 pb-2 min-[1001px]:max-h-[34%]">
+          <ol className="scroll-thin max-h-72 overflow-y-auto border-t border-line min-[1001px]:max-h-[34%]">
             {ranked.map((site, index) => {
               const active = site.name === selectedName;
               return (
-                <li key={site.name}>
+                <li key={site.name} className="border-b border-line">
                   <button
                     type="button"
                     data-site={site.name}
                     onClick={() => selectSite(site)}
-                    className={`grid w-full grid-cols-[1.4rem_minmax(0,1fr)_2.6rem] items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition duration-200 ${
-                      active ? "bg-panel-2 shadow-[inset_3px_0_0_#e9f542]" : "hover:bg-panel-2/80"
+                    className={`grid w-full grid-cols-[1.4rem_minmax(0,1fr)_2.6rem] items-center gap-2 px-4 py-2 text-left text-sm sm:px-5 ${
+                      active ? "border-l-2 border-l-accent bg-white/[0.04]" : "hover:bg-white/[0.03]"
                     }`}
                   >
-                    <span className="font-mono text-[11px] text-muted">{index + 1}</span>
+                    <span className="font-mono text-[11px] text-muted tabular-nums">{index + 1}</span>
                     <span className="min-w-0 leading-snug">
                       {site.name}
                       {site.estado === "candidato" ? (
-                        <span className="ml-1.5 inline-block rounded-full border border-accent/70 px-1.5 py-px align-middle text-[9px] font-bold tracking-wide text-accent uppercase">
-                          Candidato
-                        </span>
+                        <span className="kicker ml-2 text-accent">Candidato</span>
                       ) : site.nuevo ? (
-                        <span className="ml-1.5 inline-block rounded-full bg-accent px-1.5 py-px align-middle text-[9px] font-bold text-[#111]">
-                          NUEVO
-                        </span>
+                        <span className="kicker ml-2 text-muted">Nuevo</span>
                       ) : null}
                     </span>
                     <span
-                      className="text-right font-mono text-sm font-bold"
-                      style={{ color: scoreColor(site.score) }}
+                      className="text-right font-mono text-sm font-medium text-accent tabular-nums"
+                      style={{ opacity: scoreInk(site.score) }}
                     >
                       {site.score}
                     </span>
@@ -327,18 +331,18 @@ export default function AnalogFinder() {
           </ol>
 
           <div ref={detailRef} className="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-5 sm:px-5">
-            <h2 className="mb-2 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Detalle</h2>
+            <h2 className="display mb-2 text-2xl text-muted">Detalle</h2>
             {selected ? (
               <Detail site={selected} target={target} weights={weights} />
             ) : (
-              <p className="rounded-2xl border border-dashed border-line bg-panel-2/50 px-4 py-8 text-center text-sm text-muted">
+              <p className="border border-line px-4 py-8 text-center text-sm text-muted">
                 Haz clic en un lugar del mapa o de la lista.
               </p>
             )}
           </div>
         </aside>
       </div>
-      {showWelcome ? <WelcomeScreen onDone={closeWelcome} /> : null}
+      {showWelcome ? <WelcomeScreen onDone={closeWelcome} siteCount={SITES.length} /> : null}
       {aboutOpen ? <AboutDialog onClose={closeAbout} /> : null}
     </div>
   );
@@ -346,32 +350,18 @@ export default function AnalogFinder() {
 
 function Detail({ site, target, weights }: { site: Site; target: Target; weights: Weights }) {
   const score = scoreSite(site, target, weights);
-  const color = scoreColor(score);
   const diffs = dimensionDiffs(site, target, weights);
   const { parecidos, fallas } = analogyLists(diffs);
   const cuerpo = target.body === "luna" ? "la Luna" : "Marte";
 
   return (
-    <article
-      key={`${site.name}-${target.id}`}
-      className="rise rounded-2xl border border-line bg-panel-2 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.22)]"
-    >
-      <h3 className="font-display text-lg leading-tight font-semibold">{site.name}</h3>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {site.estado === "candidato" ? (
-          <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#111] uppercase">
-            Candidato
-          </span>
-        ) : null}
+    <article key={`${site.name}-${target.id}`} className="brackets relative overflow-hidden border border-line bg-panel p-4">
+      <span className="scan-line" aria-hidden="true" />
+      <h3 className="display text-2xl leading-none">{site.name}</h3>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        {site.estado === "candidato" ? <span className="kicker text-accent">Candidato</span> : null}
         {site.analogoDe?.map((body) => (
-          <span
-            key={body}
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold text-[#111] ${
-              body.toLowerCase() === "marte" ? "bg-mars" : "bg-moon"
-            }`}
-          >
-            {body}
-          </span>
+          <BodyTag key={body} body={body} />
         ))}
       </div>
       {site.tipoAnalogo ? <p className="mt-2 text-sm text-muted">{site.tipoAnalogo}</p> : null}
@@ -380,13 +370,8 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
         {site.nuevo && site.estado !== "candidato" ? " · poco estudiado como análogo" : ""}
       </p>
       <p className="mt-3 flex flex-wrap items-end gap-x-2 gap-y-1">
-        <span
-          className="font-mono text-5xl leading-none font-extrabold"
-          style={{ color, textShadow: `0 0 28px ${color}66` }}
-        >
-          {score}
-        </span>
-        <span className="pb-1 text-sm text-muted">/ 100 de parecido con {target.name}</span>
+        <CountUp value={score} />
+        <span className="pb-2 font-mono text-sm text-muted tabular-nums">/ 100 de parecido con {target.name}</span>
       </p>
       {!site.p && site.similitud ? (
         <p className="mt-2 text-[11px] leading-relaxed text-muted">
@@ -401,7 +386,7 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
 
       {diffs.length > 0 ? (
         <>
-          <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Se parece en</h4>
+          <h4 className="display mt-4 text-2xl text-muted">Se parece en</h4>
           <ul className="ok-list">
             {parecidos.length > 0 ? (
               parecidos.map((item) => (
@@ -414,9 +399,7 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
             )}
           </ul>
 
-          <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-            Dónde falla la analogía
-          </h4>
+          <h4 className="display mt-4 text-2xl text-muted">Dónde falla la analogía</h4>
           <ul className="fail-list">
             {fallas.map((item) => (
               <li key={item.key}>
@@ -431,9 +414,7 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
 
       {site.pruebas && site.pruebas.length > 0 ? null : site.prueba ? (
         <>
-          <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-            Qué se podría probar aquí
-          </h4>
+          <h4 className="display mt-4 text-2xl text-muted">Qué se podría probar aquí</h4>
           <p className="mt-1 text-sm leading-relaxed">{site.prueba}</p>
         </>
       ) : null}
@@ -442,41 +423,39 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
 
       {diffs.length > 0 ? (
         <>
-          <h4 className="mt-4 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-            Comparación por categoría
-          </h4>
-          <div className="mt-2 space-y-2.5">
+          <h4 className="display mt-4 text-2xl text-muted">Comparación por categoría</h4>
+          <div className="mt-3 space-y-3">
             {diffs.map((item) => (
               <div key={item.key}>
-                <div className="flex justify-between gap-3 text-[11px] text-muted">
+                <div className="flex items-baseline justify-between gap-3 text-[13px]">
                   <span>
                     {item.name} <SourceTag dim={item.key} site={site} />
                   </span>
-                  <span className="font-mono">
-                    {item.earth} vs {item.target}
-                  </span>
                 </div>
-                <div className="relative mt-1 h-2 rounded-full bg-canvas">
-                  <div
-                    className="absolute top-0 left-0 h-2 rounded-full bg-earth"
-                    style={{ width: `${item.earth * 10}%` }}
-                  />
-                  <div
-                    className="absolute -top-[3px] h-3.5 w-[3px] rounded-sm bg-accent"
-                    style={{ left: `calc(${item.target * 10}% - 1px)` }}
-                  />
+                <div className="mt-1 flex h-2 items-stretch">
+                  <div className="flex w-1/2 justify-end bg-white/[0.04]">
+                    <div className="h-full bg-[#d7d7d7]" style={{ width: `${item.earth * 10}%` }} />
+                  </div>
+                  <div className="w-px shrink-0 bg-accent" />
+                  <div className="flex w-1/2 justify-start bg-white/[0.04]">
+                    <div className="h-full bg-accent" style={{ width: `${item.target * 10}%` }} />
+                  </div>
+                </div>
+                <div className="mt-0.5 flex justify-between font-mono text-[11px] tabular-nums">
+                  <span>{item.earth}</span>
+                  <span className="text-accent">{item.target}</span>
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-2 flex gap-3 text-[11px] text-muted">
+          <div className="mt-2 flex gap-4 text-[11px] text-muted">
             <span className="inline-flex items-center gap-1.5">
-              <i className="inline-block h-2 w-2.5 rounded-sm bg-earth" />
+              <i className="inline-block h-1.5 w-1.5 bg-[#d7d7d7]" />
               Tierra
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <i className="inline-block h-2 w-2.5 rounded-sm bg-accent" />
-              {bodyLabel(target.body)}
+              <i className="inline-block h-1.5 w-1.5 bg-accent" />
+              {target.body === "luna" ? "Luna" : "Marte"}
             </span>
           </div>
         </>
@@ -506,19 +485,19 @@ function Dossier({ site }: { site: Site }) {
         <dl className="grid gap-2 text-sm">
           {site.altitud ? (
             <div>
-              <dt className="text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">Altitud</dt>
+              <dt className="kicker text-muted">Altitud</dt>
               <dd className="mt-0.5 leading-relaxed">{site.altitud}</dd>
             </div>
           ) : null}
           {site.ubicacion ? (
             <div>
-              <dt className="text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">Ubicación</dt>
+              <dt className="kicker text-muted">Ubicación</dt>
               <dd className="mt-0.5 leading-relaxed">{site.ubicacion}</dd>
             </div>
           ) : null}
           {site.tipoTerreno ? (
             <div>
-              <dt className="text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">Tipo de terreno</dt>
+              <dt className="kicker text-muted">Tipo de terreno</dt>
               <dd className="mt-0.5 leading-relaxed">{site.tipoTerreno}</dd>
             </div>
           ) : null}
@@ -529,7 +508,7 @@ function Dossier({ site }: { site: Site }) {
 
       {site.comparacion ? (
         <section>
-          <h4 className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Comparación</h4>
+          <h4 className="display text-2xl text-muted">Comparación</h4>
           <p className="mt-1 text-sm font-semibold">{site.comparacion.lugar}</p>
           <p className="mt-1 text-sm leading-relaxed">{site.comparacion.explicacion}</p>
         </section>
@@ -540,9 +519,7 @@ function Dossier({ site }: { site: Site }) {
 
       {site.verificacionNasa && site.verificacionNasa.length > 0 ? (
         <section>
-          <h4 className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-            Cómo verificarlo con datos de NASA
-          </h4>
+      <h4 className="section-title">Cómo verificarlo con datos de NASA</h4>
           <ul className="mt-1 space-y-1.5 text-sm leading-relaxed">
             {site.verificacionNasa.map((item) => (
               <li key={item.recurso}>
@@ -561,9 +538,10 @@ function Dossier({ site }: { site: Site }) {
 
 function FactList({ title, items }: { title: string; items?: string[] }) {
   if (!items || items.length === 0) return null;
+  const short = title.length <= 24;
   return (
     <section>
-      <h4 className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">{title}</h4>
+      <h4 className={short ? "display text-2xl text-muted" : "section-title"}>{title}</h4>
       <ul className="mt-1 list-disc space-y-1 pl-4 text-sm leading-relaxed">
         {items.map((item) => (
           <li key={item}>{item}</li>
@@ -585,15 +563,13 @@ function NasaPower({ site }: { site: Site }) {
   ] as const;
 
   return (
-    <section className="mt-4 rounded-xl border border-earth/30 bg-canvas/50 p-3">
-      <h4 className="text-[11px] font-semibold tracking-[0.16em] text-earth uppercase">
-        Datos reales · NASA POWER
-      </h4>
-      <dl className="mt-2 grid grid-cols-2 gap-2">
+    <section className="mt-4 border-t border-line pt-3">
+      <h4 className="display mt-4 text-2xl text-muted">Datos reales · NASA POWER</h4>
+      <dl className="mt-2 border-t border-line">
         {rows.map(([label, value]) => (
-          <div key={label} className="rounded-lg bg-panel/80 px-2.5 py-2">
-            <dt className="text-[10px] leading-tight text-muted">{label}</dt>
-            <dd className="mt-0.5 font-mono text-sm text-ink">{value}</dd>
+          <div key={label} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line py-1.5">
+            <dt className="text-sm text-muted">{label}</dt>
+            <dd className="font-mono text-sm tabular-nums">{value}</dd>
           </div>
         ))}
       </dl>

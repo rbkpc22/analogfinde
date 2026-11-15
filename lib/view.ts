@@ -15,5 +15,6 @@ export type MapViewProps = {
   sites: MapSite[];
   selectedName: string | null;
   flyTarget: FlyTarget | null;
+  accent: string;
   onSelect: (site: Site) => void;
 };

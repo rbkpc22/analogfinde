@@ -6,8 +6,8 @@ import type { MapViewProps } from "@/lib/view";
 const MapView = dynamic(() => import("./MapView"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full w-full items-center justify-center bg-[#0b0f1a] text-sm text-muted">
-      <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-accent" />
+    <div className="flex h-full w-full items-center justify-center bg-canvas text-sm text-muted">
+      <span className="mr-2 inline-block h-1.5 w-1.5 bg-accent" />
       Cargando mapa…
     </div>
   ),

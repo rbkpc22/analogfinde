@@ -43,14 +43,12 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-title"
-        className="rise relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border border-line bg-[#101726] shadow-[0_24px_80px_rgba(0,0,0,0.45)] sm:rounded-3xl"
+        className="brackets rise relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden border border-line bg-panel"
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div>
-            <p className="font-mono text-[10px] tracking-[0.18em] text-accent uppercase">
-              NASA Space Apps Challenge 2026
-            </p>
-            <h2 id="about-title" className="font-display text-xl font-semibold">
+            <p className="kicker text-muted">NASA Space Apps Challenge 2026</p>
+            <h2 id="about-title" className="font-display text-xl font-medium">
               Acerca del proyecto
             </h2>
           </div>
@@ -58,7 +56,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-full border border-line px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-accent"
+            className="kicker shrink-0 border border-line px-3 py-2 text-muted transition hover:border-accent hover:text-accent"
           >
             Cerrar
           </button>
@@ -66,7 +64,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
 
         <div className="scroll-thin space-y-6 overflow-y-auto px-5 py-5 text-sm leading-relaxed">
           <section>
-            <h3 className="mb-1 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">El reto</h3>
+            <h3 className="display mb-1 text-2xl text-muted">El reto</h3>
             <p>
               AnalogFinder participa en el NASA Space Apps Challenge 2026. El reto es encontrar lugares de
               la Tierra análogos a sitios de la Luna y de Marte: dónde se parecen, y dónde la comparación
@@ -75,9 +73,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
           </section>
 
           <section>
-            <h3 className="mb-1 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-              Metodología
-            </h3>
+            <h3 className="display mb-1 text-2xl text-muted">Metodología</h3>
             <p>
               Cada lugar y cada objetivo se describen con {DIMS.length} categorías, en una escala de 0 a 10:{" "}
               {DIMS.map((dim) => dim.name).join(", ")}.
@@ -86,7 +82,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
               El parecido es un puntaje de 0 a 100. Si todos los pesos están en cero, el resultado es 0. Si
               no, la fórmula es
             </p>
-            <p className="mt-2 rounded-xl bg-canvas px-3 py-2 font-mono text-[13px] text-accent">
+            <p className="mt-2 border border-line bg-canvas px-3 py-2 font-mono text-[13px] text-accent tabular-nums">
               100 × (1 − diferencia promedio ponderada / 10)
             </p>
             <p className="mt-2">
@@ -95,7 +91,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
               diferencias se divide entre 10, que es el máximo de la escala.
             </p>
             <p className="mt-2">
-              <span className="text-earth">Frío</span> y <span className="text-earth">aridez</span> de los
+              <span className="text-accent">Frío</span> y <span className="text-accent">aridez</span> de los
               lugares en la Tierra salen de NASA POWER: climatología por punto, comunidad RE, valor anual.
               El frío usa la temperatura media (T2M): 0 si el año promedia 25 °C o más, y 10 si promedia
               −15 °C o menos. La aridez usa la precipitación (PRECTOTCORR): 10 con 0.2 mm/día o menos, y 0
@@ -108,20 +104,22 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
           </section>
 
           <section>
-            <h3 className="mb-1 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
+            <h3 className="mb-1 section-title">
               Límites de cualquier análogo terrestre
             </h3>
             <p>Ningún lugar de la Tierra puede imitar esto:</p>
             <ul className="mt-2 space-y-2">
               <li>
-                <span className="mr-1.5 inline-block rounded-full bg-moon px-1.5 py-px text-[10px] font-semibold text-[#111]">
-                  LUNA
+                <span className="kicker mr-2 inline-flex items-center gap-1.5 text-ink">
+                  <i className="inline-block h-1.5 w-1.5 bg-moon" />
+                  Luna
                 </span>
                 {LIMITES.luna}
               </li>
               <li>
-                <span className="mr-1.5 inline-block rounded-full bg-mars px-1.5 py-px text-[10px] font-semibold text-[#111]">
-                  MARTE
+                <span className="kicker mr-2 inline-flex items-center gap-1.5 text-ink">
+                  <i className="inline-block h-1.5 w-1.5 bg-mars" />
+                  Marte
                 </span>
                 {LIMITES.marte}
               </li>
@@ -129,8 +127,8 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
           </section>
 
           <section>
-            <h3 className="mb-1 text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">Equipo</h3>
-            <ul className="divide-y divide-line/80 rounded-xl border border-line">
+            <h3 className="display mb-1 text-2xl text-muted">Equipo</h3>
+            <ul className="divide-y divide-line border-y border-line">
               {TEAM.map((person, index) => (
                 <li key={index} className="px-3 py-2.5">
                   <p className={person.name ? "text-ink" : "text-muted"}>

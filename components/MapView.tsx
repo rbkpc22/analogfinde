@@ -6,6 +6,7 @@ import {
   GeoJSONSource,
   Map,
   type MapLayerMouseEvent,
+  Marker,
   NavigationControl,
   Popup,
   setWorkerUrl,
@@ -50,6 +51,8 @@ const estilo = {
       source: "satelite",
       paint: {
         "raster-opacity": ["interpolate", ["linear"], ["zoom"], 5, 1, 7, 0],
+        "raster-saturation": -0.4,
+        "raster-brightness-max": 0.85,
       },
     },
     {
@@ -80,6 +83,27 @@ function esc(value: string) {
   });
 }
 
+function formatCoord(lat: number, lng: number) {
+  const ns = lat >= 0 ? "N" : "S";
+  const ew = lng >= 0 ? "E" : "W";
+  return `${Math.abs(lat).toFixed(4)}°${ns} ${Math.abs(lng).toFixed(4)}°${ew}`;
+}
+
+function graticule() {
+  const features: { type: "Feature"; properties: Record<string, never>; geometry: { type: "LineString"; coordinates: [number, number][] } }[] = [];
+  for (let lng = -180; lng < 180; lng += 30) {
+    const coordinates: [number, number][] = [];
+    for (let lat = -80; lat <= 80; lat += 4) coordinates.push([lng, lat]);
+    features.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates } });
+  }
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const coordinates: [number, number][] = [];
+    for (let lng = -180; lng <= 180; lng += 6) coordinates.push([lng, lat]);
+    features.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates } });
+  }
+  return { type: "FeatureCollection" as const, features };
+}
+
 function collection(sites: MapSite[], selectedName: string | null) {
   return {
     type: "FeatureCollection" as const,
@@ -101,7 +125,7 @@ function collection(sites: MapSite[], selectedName: string | null) {
 function popupHtml(site: MapSite) {
   const candidato =
     site.estado === "candidato"
-      ? `<div style="display:inline-block;margin:4px 0 6px;background:#e9f542;color:#111;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700">Candidato</div>`
+      ? `<div style="margin:4px 0 6px;font-size:11px;letter-spacing:0.14em">CANDIDATO</div>`
       : "";
   const extra = [
     site.altitud ? `<div><b>Altitud:</b> ${esc(site.altitud)}</div>` : "",
@@ -123,7 +147,7 @@ function popupHtml(site: MapSite) {
   );
 }
 
-export default function MapView({ sites, selectedName, flyTarget, onSelect }: MapViewProps) {
+export default function MapView({ sites, selectedName, flyTarget, accent, onSelect }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const popupRef = useRef<Popup | null>(null);
@@ -135,9 +159,11 @@ export default function MapView({ sites, selectedName, flyTarget, onSelect }: Ma
   const flownSeq = useRef<number | null>(null);
   const syncRef = useRef<() => void>(() => {});
   const flyRef = useRef<() => void>(() => {});
-  const propsRef = useRef({ sites, selectedName, flyTarget, onSelect });
-  propsRef.current = { sites, selectedName, flyTarget, onSelect };
+  const propsRef = useRef({ sites, selectedName, flyTarget, onSelect, accent });
+  propsRef.current = { sites, selectedName, flyTarget, onSelect, accent };
+  const paintRef = useRef<() => void>(() => {});
   const [closeUp, setCloseUp] = useState(false);
+  const [cursor, setCursor] = useState("");
 
   useEffect(() => {
     const container = containerRef.current;
@@ -154,21 +180,54 @@ export default function MapView({ sites, selectedName, flyTarget, onSelect }: Ma
     mapa.addControl(new NavigationControl({ showCompass: false }), "top-right");
     mapa.addControl(new AttributionControl({ compact: true }), "bottom-right");
 
+    const paintAccent = () => {
+      if (!mapa.isStyleLoaded()) return;
+      const color = propsRef.current.accent;
+      mapa.setSky({
+        "sky-color": "#050505",
+        "horizon-color": color,
+        "fog-color": "#050505",
+        "atmosphere-blend": 0.7,
+        "horizon-fog-blend": 0.2,
+        "sky-horizon-blend": 0.45,
+      });
+      if (mapa.getLayer("sitios")) {
+        mapa.setPaintProperty("sitios", "circle-color", color);
+        mapa.setPaintProperty("sitios", "circle-stroke-color", color);
+      }
+      if (mapa.getLayer("sitios-pulso")) {
+        mapa.setPaintProperty("sitios-pulso", "circle-stroke-color", color);
+      }
+      if (mapa.getLayer("reticula")) {
+        mapa.setPaintProperty("reticula", "line-color", color);
+      }
+    };
+
     const paintSpace = () => {
       mapa.setProjection({ type: "globe" });
-      mapa.setSky({
-        "sky-color": "#05070d",
-        "horizon-color": "#1a3358",
-        "fog-color": "#05070d",
-        "atmosphere-blend": 0.85,
-      });
+      paintAccent();
     };
+
+    const markerEl = document.createElement("div");
+    markerEl.className = "crosshair";
+    const markerLabel = document.createElement("span");
+    markerEl.append(markerLabel);
+    const crosshair = new Marker({ element: markerEl, anchor: "center" });
 
     const syncSites = () => {
       if (!readyRef.current) return;
       const data = collection(propsRef.current.sites, propsRef.current.selectedName);
       const source = mapa.getSource("sitios");
       if (source instanceof GeoJSONSource) source.setData(data);
+      const selected = propsRef.current.sites.find(
+        (site) => site.name === propsRef.current.selectedName && site.visible,
+      );
+      if (!selected) {
+        crosshair.remove();
+        return;
+      }
+      markerLabel.textContent = selected.name;
+      crosshair.setLngLat([selected.lng, selected.lat]).addTo(mapa);
     };
 
     const openPopup = (site: MapSite) => {
@@ -218,8 +277,10 @@ export default function MapView({ sites, selectedName, flyTarget, onSelect }: Ma
 
     syncRef.current = syncSites;
     flyRef.current = flySelection;
+    paintRef.current = paintAccent;
 
     mapa.on("style.load", paintSpace);
+    let pulseFrame = 0;
     mapa.on("load", () => {
       readyRef.current = true;
       spinningRef.current = !reduceMotion();
@@ -227,21 +288,51 @@ export default function MapView({ sites, selectedName, flyTarget, onSelect }: Ma
         type: "geojson",
         data: collection(propsRef.current.sites, propsRef.current.selectedName),
       });
+      mapa.addSource("reticula", { type: "geojson", data: graticule() });
+      mapa.addLayer({
+        id: "reticula",
+        type: "line",
+        source: "reticula",
+        paint: {
+          "line-color": propsRef.current.accent,
+          "line-width": 1,
+          "line-opacity": 0.12,
+        },
+      });
       mapa.addLayer({
         id: "sitios",
         type: "circle",
         source: "sitios",
         paint: {
-          "circle-color": ["step", ["get", "puntaje"], "#ff6b6b", 50, "#f5a142", 65, "#e9f542", 80, "#5fdc8f"],
-          "circle-radius": [
+          "circle-color": propsRef.current.accent,
+          "circle-radius": ["case", ["==", ["get", "visible"], 1], 7, 0],
+          "circle-opacity": [
             "case",
             ["==", ["get", "visible"], 1],
-            ["interpolate", ["linear"], ["get", "puntaje"], 0, 6, 100, 14],
+            ["interpolate", ["linear"], ["get", "puntaje"], 0, 0.12, 100, 0.45],
             0,
           ],
-          "circle-opacity": ["case", ["==", ["get", "visible"], 1], 0.95, 0],
-          "circle-stroke-width": ["case", ["==", ["get", "selected"], 1], 3, 2],
-          "circle-stroke-color": ["case", ["==", ["get", "selected"], 1], "#E9F542", "#111"],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": propsRef.current.accent,
+          "circle-stroke-opacity": [
+            "case",
+            ["==", ["get", "visible"], 1],
+            ["interpolate", ["linear"], ["get", "puntaje"], 0, 0.3, 100, 1],
+            0,
+          ],
+        },
+      });
+      mapa.addLayer({
+        id: "sitios-pulso",
+        type: "circle",
+        source: "sitios",
+        filter: ["all", ["==", ["get", "visible"], 1], [">=", ["get", "puntaje"], 80]],
+        paint: {
+          "circle-color": "transparent",
+          "circle-radius": 8,
+          "circle-stroke-width": 2,
+          "circle-stroke-color": propsRef.current.accent,
+          "circle-stroke-opacity": 0.7,
         },
       });
       mapa.on("click", "sitios", (event: MapLayerMouseEvent) => {
@@ -258,8 +349,22 @@ export default function MapView({ sites, selectedName, flyTarget, onSelect }: Ma
       mapa.on("mouseleave", "sitios", () => {
         mapa.getCanvas().style.cursor = "";
       });
+      mapa.on("mousemove", (event) => {
+        setCursor(formatCoord(event.lngLat.lat, event.lngLat.lng));
+      });
+      paintAccent();
       flySelection();
       spin();
+      if (!reduceMotion()) {
+        const pulse = (time: number) => {
+          if (!mapRef.current?.getLayer("sitios-pulso")) return;
+          const phase = (time % 2500) / 2500;
+          mapRef.current.setPaintProperty("sitios-pulso", "circle-radius", 8 + phase * 14);
+          mapRef.current.setPaintProperty("sitios-pulso", "circle-stroke-opacity", (1 - phase) * 0.65);
+          pulseFrame = requestAnimationFrame(pulse);
+        };
+        pulseFrame = requestAnimationFrame(pulse);
+      }
     });
 
     const hold = () => {
@@ -286,15 +391,22 @@ export default function MapView({ sites, selectedName, flyTarget, onSelect }: Ma
 
     return () => {
       window.clearTimeout(timer);
+      cancelAnimationFrame(pulseFrame);
       observer.disconnect();
       popupRef.current?.remove();
+      crosshair.remove();
       readyRef.current = false;
       syncRef.current = () => {};
       flyRef.current = () => {};
+      paintRef.current = () => {};
       mapa.remove();
       mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    paintRef.current();
+  }, [accent]);
 
   useEffect(() => {
     syncRef.current();
@@ -350,12 +462,17 @@ export default function MapView({ sites, selectedName, flyTarget, onSelect }: Ma
         id="volver"
         type="button"
         onClick={volver}
-        className={`absolute top-[52px] right-2.5 z-10 rounded-xl bg-[#1f6feb] px-3.5 py-2.5 text-sm font-medium text-white shadow-lg transition hover:bg-[#388bfd] min-[641px]:top-2.5 min-[641px]:right-14 ${
+        className={`absolute top-[52px] right-2.5 z-10 border border-accent bg-panel px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-accent uppercase min-[641px]:top-2.5 min-[641px]:right-14 ${
           closeUp ? "" : "hidden"
         }`}
       >
         Volver al globo
       </button>
+      {cursor ? (
+        <p className="pointer-events-none absolute bottom-2 left-3 z-10 font-mono text-[11px] tracking-[0.04em] text-[var(--text)] tabular-nums">
+          {cursor}
+        </p>
+      ) : null}
     </div>
   );
 }
