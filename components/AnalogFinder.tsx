@@ -550,7 +550,7 @@ export default function AnalogFinder() {
               </p>
             ) : null}
 
-            <div className="pointer-events-none absolute bottom-3 left-3 z-20 w-32 max-md:bottom-[47vh]">
+            <div className="pointer-events-none absolute bottom-3 left-3 z-20 w-32 max-md:bottom-[300px]">
               <div
                 className="h-1 w-full"
                 style={{
@@ -566,8 +566,8 @@ export default function AnalogFinder() {
             </div>
 
             {controlsOpen ? (
-              <aside className="brackets absolute z-[35] flex min-h-0 flex-col overflow-hidden border border-line bg-panel/90 max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[72vh] max-md:w-full md:top-3 md:bottom-16 md:left-3 md:w-[320px]">
-                <div className="flex justify-end px-2 pt-2">
+              <aside className="brackets scroll-thin absolute z-[35] h-auto max-h-[calc(100vh-100px)] overflow-y-auto border border-line bg-panel/90 max-md:inset-x-0 max-md:bottom-0 max-md:w-full md:top-3 md:left-3 md:w-[320px]">
+                <div className="sticky top-0 z-10 flex justify-end bg-panel/90 px-2 pt-2 pb-1">
                   <button
                     type="button"
                     aria-label={t("minimizePanel")}
@@ -577,7 +577,7 @@ export default function AnalogFinder() {
                     —
                   </button>
                 </div>
-                <div className="scroll-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-3 pb-3">
+                <div className="space-y-4 px-3 pb-3">
                   <section>
                     <h2 className="display mb-2 text-2xl text-muted">{t("objective")}</h2>
                     <div ref={targetMenuRef}>
@@ -717,11 +717,11 @@ export default function AnalogFinder() {
               </button>
             )}
 
-            <aside className={`brackets absolute z-30 flex min-h-0 flex-col overflow-hidden border border-line bg-panel/90 max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[46vh] max-md:w-full md:top-3 md:right-3 md:bottom-3 md:w-[320px] ${sheetOpen ? "max-md:hidden" : ""}`}>
+            <aside className={`brackets scroll-thin absolute z-30 h-auto max-h-[calc(100vh-100px)] overflow-y-auto border border-line bg-panel/90 max-md:inset-x-0 max-md:bottom-0 max-md:w-full md:top-3 md:right-3 md:w-[320px] ${sheetOpen ? "max-md:hidden" : ""}`}>
               <div className="px-3 pt-3">
                 <h2 className="display text-2xl text-muted">{t("similarPlaces")}</h2>
               </div>
-              <div className="scroll-thin mt-2 min-h-0 flex-1 overflow-y-auto border-t border-line">
+              <div className="mt-2 border-t border-line">
                 <RankedSites ranked={shownComplete} selectedName={selectedName} onSelect={selectSite} />
                 {listOpen && partialRanked.length > 0 ? (
                   <section className="border-t border-line">
@@ -740,6 +740,16 @@ export default function AnalogFinder() {
                       }}
                     />
                   </section>
+                ) : null}
+                {canExpandList ? (
+                  <button
+                    type="button"
+                    aria-expanded={listOpen}
+                    onClick={() => setListOpen((open) => !open)}
+                    className="kicker w-full border-b border-line px-3 py-2 text-left text-accent hover:bg-white/[0.03]"
+                  >
+                    {listOpen ? t("seeLess") : t("seeAll", { count: ranked.length })}
+                  </button>
                 ) : null}
                 {candidates.length > 0 ? (
                   <section className="border-t border-line px-3 py-3">
@@ -775,16 +785,6 @@ export default function AnalogFinder() {
                   </section>
                 ) : null}
               </div>
-              {canExpandList ? (
-                <button
-                  type="button"
-                  aria-expanded={listOpen}
-                  onClick={() => setListOpen((open) => !open)}
-                  className="kicker border-t border-line px-3 py-2 text-left text-accent hover:bg-white/[0.03]"
-                >
-                  {listOpen ? t("seeLess") : t("seeAll", { count: ranked.length })}
-                </button>
-              ) : null}
             </aside>
 
             {selected || probe ? (

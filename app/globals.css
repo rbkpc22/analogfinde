@@ -198,8 +198,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 @media (min-width: 768px) {
-  .map-stage .maplibregl-ctrl-top-right,
-  .map-stage .maplibregl-ctrl-bottom-right {
+  .map-stage .maplibregl-ctrl-top-right {
     right: 348px;
   }
 }
