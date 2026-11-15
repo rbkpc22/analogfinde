@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/components/LocaleProvider";
 
 export default function WelcomeScreen({
   onDone,
@@ -9,13 +10,10 @@ export default function WelcomeScreen({
   onDone: () => void;
   siteCount: number;
 }) {
+  const { t } = useI18n();
   const [leaving, setLeaving] = useState(false);
   const [visible, setVisible] = useState(1);
-  const lines = [
-    "INICIALIZANDO ANALOGFINDER…",
-    `${siteCount} SITIOS ANÁLOGOS CARGADOS`,
-    "FUENTE DE DATOS: NASA POWER",
-  ];
+  const lines = [t("init"), t("sitesLoaded", { count: siteCount }), t("dataSource")];
 
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -51,7 +49,7 @@ export default function WelcomeScreen({
       }`}
       role="dialog"
       aria-modal="true"
-      aria-label="Bienvenida a AnalogFinder"
+      aria-label={t("welcomeAria")}
     >
       <div className="relative z-10 w-full max-w-full text-left">
         <img src="/logo.png?v=2" alt="" width={160} height={160} className="mb-6 h-40 w-40" />
@@ -68,7 +66,7 @@ export default function WelcomeScreen({
               onClick={() => setLeaving(true)}
               className="term-line mt-4 block text-left text-accent"
             >
-              &gt; ENTRAR
+              {t("enter")}
             </button>
           ) : null}
         </div>

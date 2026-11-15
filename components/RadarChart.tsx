@@ -1,6 +1,8 @@
-import { DIMS, type Profile } from "@/lib/data";
+"use client";
 
-const LABELS = ["Aridez", "Frío", "Cráteres", "Volcán", "Polvo", "Hielo", "Cuevas", "Minerales", "Vida"];
+import { useI18n } from "@/components/LocaleProvider";
+import { DIMS, type Profile } from "@/lib/data";
+import { dimShort } from "@/lib/i18n";
 
 function point(index: number, value: number, radius: number, cx: number, cy: number) {
   const angle = -Math.PI / 2 + (index * 2 * Math.PI) / DIMS.length;
@@ -44,6 +46,7 @@ export default function RadarChart({
   targetName: string;
   known?: boolean[];
 }) {
+  const { locale, t } = useI18n();
   const cx = 140;
   const cy = 132;
   const radius = 78;
@@ -54,7 +57,7 @@ export default function RadarChart({
 
   return (
     <figure>
-      <svg viewBox="0 0 280 276" role="img" aria-label={`Radar de las 9 categorías: Tierra y ${targetName}`} className="mx-auto w-full max-w-[280px]">
+      <svg viewBox="0 0 280 276" role="img" aria-label={t("radarAria", { name: targetName })} className="mx-auto w-full max-w-[280px]">
         {Array.from({ length: 5 }, (_, ring) => {
           const ringRadius = ((ring + 1) / 5) * radius;
           const path = DIMS.map((_, index) => point(index, 10, ringRadius, cx, cy).join(",")).join(" ");
@@ -75,7 +78,7 @@ export default function RadarChart({
                 fontSize="9"
                 fontFamily="var(--font-plex-mono), ui-monospace, monospace"
               >
-                {LABELS[index]}
+                {dimShort(locale, dim.key)}
               </text>
             </g>
           );
@@ -105,7 +108,7 @@ export default function RadarChart({
       <figcaption className="mt-1 flex justify-center gap-4 text-[11px] text-muted">
         <span className="inline-flex items-center gap-1.5">
           <i className="inline-block h-1.5 w-1.5 bg-[#d7d7d7]" />
-          Tierra
+          {t("earth")}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <i className="inline-block h-1.5 w-1.5 bg-accent" />

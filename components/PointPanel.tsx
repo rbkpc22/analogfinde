@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/components/LocaleProvider";
 import type { Site, Target } from "@/lib/data";
+import { targetText } from "@/lib/i18n";
 import { aridezFromPrecipitation, frioFromTemperature, powerPointUrl } from "@/lib/nasa";
 import {
   climateScore,
@@ -56,24 +58,25 @@ export default function PointPanel({
   onSave: () => void;
   onGoToSite: (site: Site) => void;
 }) {
+  const { t } = useI18n();
   return (
     <article className="brackets relative border border-line bg-panel p-4">
-      <h3 className="display text-2xl leading-none">Punto analizado</h3>
+      <h3 className="display text-2xl leading-none">{t("analyzedPoint")}</h3>
       <p className="mt-2 font-mono text-sm tabular-nums">{formatCoord(probe.lat, probe.lng)}</p>
 
       {probe.status === "loading" ? (
-        <p className="mt-4 font-mono text-[11px] tracking-[0.08em] text-muted">CONSULTANDO NASA POWER…</p>
+        <p className="mt-4 font-mono text-[11px] tracking-[0.08em] text-muted">{t("consulting")}</p>
       ) : null}
 
       {probe.status === "error" ? (
         <div className="mt-4">
-          <p className="text-sm leading-relaxed">No se pudo consultar NASA POWER</p>
+          <p className="text-sm leading-relaxed">{t("powerFailed")}</p>
           <button
             type="button"
             onClick={onRetry}
             className="kicker mt-3 border border-line px-3 py-2 hover:border-accent hover:text-accent"
           >
-            Reintentar
+            {t("retry")}
           </button>
         </div>
       ) : null}
@@ -98,46 +101,40 @@ function Ready({
   onSave: () => void;
   onGoToSite: (site: Site) => void;
 }) {
+  const { locale, t } = useI18n();
   const score = climateScore(probe.climate, target, weights);
   const frio = frioFromTemperature(probe.climate.T2M);
   const aridez = aridezFromPrecipitation(probe.climate.PRECTOTCORR);
   const near = nearestSite(probe.lat, probe.lng);
+  const targetLabel = targetText(locale, target.id, target);
   const rows = [
-    ["Temperatura media anual", measure(probe.climate.T2M, "°C")],
-    ["Temperatura máxima", measure(probe.climate.T2M_MAX, "°C")],
-    ["Temperatura mínima", measure(probe.climate.T2M_MIN, "°C")],
-    ["Precipitación", measure(probe.climate.PRECTOTCORR, "mm/día")],
-    ...(probe.elevation === null
-      ? []
-      : [["Elevación promedio de la celda", `${probe.elevation.toFixed(0)} m`] as const]),
+    [t("tempMean"), measure(probe.climate.T2M, "°C")],
+    [t("tempMax"), measure(probe.climate.T2M_MAX, "°C")],
+    [t("tempMin"), measure(probe.climate.T2M_MIN, "°C")],
+    [t("precip"), measure(probe.climate.PRECTOTCORR, t("perDay"))],
+    ...(probe.elevation === null ? [] : [[t("cellElevation"), `${probe.elevation.toFixed(0)} m`] as const]),
   ];
 
   return (
     <>
       {score === null ? (
-        <p className="mt-4 text-sm leading-relaxed">Sube el peso de Frío o Aridez para comparar</p>
+        <p className="mt-4 text-sm leading-relaxed">{t("raiseWeights")}</p>
       ) : (
         <>
           <p className="mt-3 flex flex-wrap items-end gap-x-2 gap-y-1">
             <CountUp value={score} />
             <span className="pb-2 font-mono text-sm text-muted tabular-nums">/ 100</span>
           </p>
-          <p className="mt-1 font-mono text-[11px] tracking-[0.04em] text-muted">
-            PUNTAJE PARCIAL · 2 de 9 categorías
-          </p>
-          <p className="mt-3 text-sm leading-relaxed">
-            Este lugar se parece {score}% a {target.name} en frío y aridez.
-          </p>
+          <p className="mt-1 font-mono text-[11px] tracking-[0.04em] text-muted">{t("partialPointScore")}</p>
+          <p className="mt-3 text-sm leading-relaxed">{t("resemblesClimate", { score, name: targetLabel.name })}</p>
         </>
       )}
       {probe.elevation !== null && probe.elevation <= 0 ? (
-        <p className="mt-3 border border-line px-3 py-2 text-sm leading-relaxed text-muted">
-          Este punto podría estar en el mar; verifica que sea tierra firme.
-        </p>
+        <p className="mt-3 border border-line px-3 py-2 text-sm leading-relaxed text-muted">{t("oceanWarning")}</p>
       ) : null}
 
       <section className="mt-4 border-t border-line pt-3">
-        <h4 className="display text-2xl text-muted">Datos reales · NASA POWER</h4>
+        <h4 className="display text-2xl text-muted">{t("realData")}</h4>
         <dl className="mt-2 border-t border-line">
           {rows.map(([label, value]) => (
             <div key={label} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line py-1.5">
@@ -147,14 +144,13 @@ function Ready({
           ))}
         </dl>
         <p className="mt-2 text-[11px] leading-relaxed text-muted">
-          Frío {frio}/10 con la temperatura media y aridez {aridez}/10 con la precipitación. El valor anual
-          de la máxima es el mes más cálido y el de la mínima, el mes más frío.
+          {t("climateSentence", { frio, aridez })}
         </p>
       </section>
 
       {near ? (
         <section className="mt-4">
-          <h4 className="display text-2xl text-muted">Sitio conocido más parecido cerca</h4>
+          <h4 className="display text-2xl text-muted">{t("nearestKnown")}</h4>
           <p className="mt-2 text-sm">
             {near.site.name}
             <span className="font-mono text-muted"> · {formatKm(near.km)}</span>
@@ -164,27 +160,21 @@ function Ready({
             onClick={() => onGoToSite(near.site)}
             className="kicker mt-3 border border-accent px-3 py-2 text-accent"
           >
-            Ir a este sitio
+            {t("goToSite")}
           </button>
         </section>
       ) : null}
 
-      <p className="mt-4 text-[11px] leading-relaxed text-muted">
-        NASA POWER da promedios de una celda de 0.5° × 0.625° (unos 55 × 62 km), no del punto exacto. Solo
-        frío y aridez vienen de datos de NASA; el perfil del objetivo (Luna/Marte) es una calificación del
-        equipo. Esto indica un CANDIDATO, no un análogo confirmado.
-      </p>
+      <p className="mt-4 text-[11px] leading-relaxed text-muted">{t("powerCellNote")}</p>
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
-        Datos:{" "}
         <a
           href={powerPointUrl(probe.queryLat, probe.queryLng)}
           target="_blank"
           rel="noopener noreferrer"
           className="text-accent underline decoration-accent/40 underline-offset-2"
         >
-          NASA POWER (power.larc.nasa.gov)
+          {t("powerSource")}
         </a>
-        , climatología por punto, comunidad RE
       </p>
       <button
         type="button"
@@ -192,7 +182,7 @@ function Ready({
         disabled={saved}
         className="kicker mt-4 border border-line px-3 py-2 hover:border-accent hover:text-accent disabled:text-muted"
       >
-        {saved ? "Ya está en mis candidatos" : "Guardar como candidato"}
+        {saved ? t("savedCandidate") : t("saveCandidate")}
       </button>
     </>
   );

@@ -95,11 +95,3 @@ export function buildDeck(): Round[] {
     }));
   return shuffle([...WORLDS, ...earth]);
 }
-
-export function scoreMessage(score: number): string {
-  if (score >= 10) return "Lectura perfecta. Los tres mundos ya no se te confunden.";
-  if (score >= 9) return "Casi perfecto. Un mundo se te escapó.";
-  if (score >= 7) return "Ojo de misión. El terreno ya casi no te engaña.";
-  if (score >= 4) return "A medias. Vuelve a mirar cómo cambia el suelo.";
-  return "Todavía se parecen demasiado. El globo te espera.";
-}

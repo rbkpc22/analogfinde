@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { DIMS, LIMITES } from "@/lib/data";
+import { useI18n } from "@/components/LocaleProvider";
+import { DIMS } from "@/lib/data";
+import { dimList } from "@/lib/i18n";
 
 /**
  * Escribe aquí los nombres del equipo antes de presentar.
@@ -15,6 +17,7 @@ const TEAM: { name: string; role: string }[] = [
 ];
 
 export default function AboutDialog({ onClose }: { onClose: () => void }) {
+  const { locale, t } = useI18n();
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -35,7 +38,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-[80] flex items-end justify-center p-0 sm:items-center sm:p-6">
       <button
         type="button"
-        aria-label="Cerrar acerca del proyecto"
+        aria-label={t("aboutCloseAria")}
         className="absolute inset-0 bg-[#05070f]/75 backdrop-blur-sm"
         onClick={onClose}
       />
@@ -49,7 +52,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
           <div>
             <p className="kicker text-muted">NASA Space Apps Challenge 2026</p>
             <h2 id="about-title" className="font-display text-xl font-medium">
-              Acerca del proyecto
+              {t("aboutTitle")}
             </h2>
           </div>
           <button
@@ -58,88 +61,61 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
             onClick={onClose}
             className="kicker shrink-0 border border-line px-3 py-2 text-muted transition hover:border-accent hover:text-accent"
           >
-            Cerrar
+            {t("close")}
           </button>
         </div>
 
         <div className="scroll-thin space-y-6 overflow-y-auto px-5 py-5 text-sm leading-relaxed">
           <section>
-            <h3 className="display mb-1 text-2xl text-muted">El reto</h3>
-            <p>
-              AnalogFinder participa en el NASA Space Apps Challenge 2026. El reto es encontrar lugares de
-              la Tierra análogos a sitios de la Luna y de Marte: dónde se parecen, y dónde la comparación
-              deja de servir.
-            </p>
+            <h3 className="display mb-1 text-2xl text-muted">{t("theChallenge")}</h3>
+            <p>{t("challengeBody")}</p>
           </section>
 
           <section>
-            <h3 className="display mb-1 text-2xl text-muted">Metodología</h3>
-            <p>
-              Cada lugar y cada objetivo se describen con {DIMS.length} categorías, en una escala de 0 a 10:{" "}
-              {DIMS.map((dim) => dim.name).join(", ")}.
-            </p>
-            <p className="mt-2">
-              El parecido es un puntaje de 0 a 100. Si todos los pesos están en cero, el resultado es 0. Si
-              no, la fórmula es
-            </p>
+            <h3 className="display mb-1 text-2xl text-muted">{t("methodHeading")}</h3>
+            <p>{t("methodIntro", { count: DIMS.length, names: dimList(locale) })}</p>
+            <p className="mt-2">{t("methodZero")}</p>
             <p className="mt-2 border border-line bg-canvas px-3 py-2 font-mono text-[13px] text-accent tabular-nums">
-              100 × (1 − diferencia promedio ponderada / 10)
+              {t("formula")}
             </p>
-            <p className="mt-2">
-              La diferencia de cada categoría es el valor absoluto entre el lugar y el objetivo. El peso de
-              esa categoría va de 0 (no cuenta) a 3 (cuenta el triple). El promedio ponderado de esas
-              diferencias se divide entre 10, que es el máximo de la escala.
-            </p>
-            <p className="mt-2">
-              <span className="text-accent">Frío</span> y <span className="text-accent">aridez</span> de los
-              lugares en la Tierra salen de NASA POWER: climatología por punto, comunidad RE, valor anual.
-              El frío usa la temperatura media (T2M): 0 si el año promedia 25 °C o más, y 10 si promedia
-              −15 °C o menos. La aridez usa la precipitación (PRECTOTCORR): 10 con 0.2 mm/día o menos, y 0
-              con 4 mm/día o más. Entre esos extremos la escala es lineal.
-            </p>
-            <p className="mt-2">
-              Las otras siete categorías, y todo el perfil del objetivo en la Luna o en Marte, siguen siendo
-              estimaciones del equipo a partir de la literatura cuando hay un número. En la interfaz aparecen
-              como «Estimado». Si un lugar no trae número en una categoría, esa no entra al puntaje y la ficha
-              lo marca como puntaje parcial.
-            </p>
+            <p className="mt-2">{t("methodDiff")}</p>
+            <p className="mt-2">{t("methodPower")}</p>
+            <p className="mt-2">{t("methodEstimate")}</p>
             <a href="/metodologia" className="kicker mt-3 inline-block text-accent">
-              Ver la página de metodología
+              {t("seeMethod")}
             </a>
           </section>
 
           <section>
-            <h3 className="mb-1 section-title">
-              Límites de cualquier análogo terrestre
-            </h3>
-            <p>Ningún lugar de la Tierra puede imitar esto:</p>
+            <h3 className="mb-1 section-title">{t("limitsTitle")}</h3>
+            <p>{t("limitsLead")}</p>
             <ul className="mt-2 space-y-2">
               <li>
                 <span className="kicker mr-2 inline-flex items-center gap-1.5 text-ink">
                   <i className="inline-block h-1.5 w-1.5 bg-moon" />
-                  Luna
+                  {t("moon")}
                 </span>
-                {LIMITES.luna}
+                {t("limitsMoon")}
               </li>
               <li>
                 <span className="kicker mr-2 inline-flex items-center gap-1.5 text-ink">
                   <i className="inline-block h-1.5 w-1.5 bg-mars" />
-                  Marte
+                  {t("mars")}
                 </span>
-                {LIMITES.marte}
+                {t("limitsMars")}
               </li>
             </ul>
           </section>
 
           <section>
-            <h3 className="display mb-1 text-2xl text-muted">Equipo</h3>
+            <h3 className="display mb-1 text-2xl text-muted">{t("team")}</h3>
             <ul className="divide-y divide-line border-y border-line">
               {TEAM.map((person, index) => (
                 <li key={index} className="px-3 py-2.5">
                   <p className={person.name ? "text-ink" : "text-muted"}>
-                    {person.name || "Nombre del integrante"}
+                    {person.name || t("memberName")}
                   </p>
-                  <p className="text-xs text-muted">{person.role || "Rol en el equipo"}</p>
+                  <p className="text-xs text-muted">{person.role || t("memberRole")}</p>
                 </li>
               ))}
             </ul>

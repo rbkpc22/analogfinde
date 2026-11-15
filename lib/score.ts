@@ -42,6 +42,21 @@ export function partialScoreLabel(site: Site): string | null {
   return `PUNTAJE PARCIAL · ${covered.known} de ${covered.total} categorías`;
 }
 
+/** Las 9 categorías tienen número. Un expediente sin perfil no cuenta como completo. */
+export function hasCompleteProfile(site: Site): boolean {
+  if (!site.p) return false;
+  return DIMS.every((dim) => categoryKnown(site, dim.key));
+}
+
+/** Si el objetivo es la Luna y el sitio es solo de Marte, o al revés. */
+export function mismatchedBodyNote(site: Site, target: Target): string | null {
+  const bodies = (site.analogoDe ?? []).map((value) => value.trim().toLowerCase());
+  if (bodies.length !== 1) return null;
+  if (target.body === "luna" && bodies[0] === "marte") return "Análogo de Marte";
+  if (target.body === "marte" && bodies[0] === "luna") return "Análogo de Luna";
+  return null;
+}
+
 /** Similitud = 100 × (1 − diferencia promedio ponderada / 10). Solo entran las categorías con dato. */
 export function scoreSite(site: Site, target: Target, weights: Weights): number {
   if (!site.p) return similitudScore(site) ?? 0;

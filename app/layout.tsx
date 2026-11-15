@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, IBM_Plex_Mono, IBM_Plex_Sans_Condensed } from "next/font/google";
+import { LocaleProvider } from "@/components/LocaleProvider";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -30,7 +31,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es" className={`${archivo.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased`}>
-      <body className="min-h-full bg-canvas font-sans text-ink">{children}</body>
+      <body className="min-h-full bg-canvas font-sans text-ink">
+        <LocaleProvider>{children}</LocaleProvider>
+      </body>
     </html>
   );
 }

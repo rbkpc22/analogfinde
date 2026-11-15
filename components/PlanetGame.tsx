@@ -1,13 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { buildDeck, scoreMessage, type Planet, type Round } from "@/lib/game";
-
-const CHOICES: { id: Planet; label: string }[] = [
-  { id: "tierra", label: "Tierra" },
-  { id: "luna", label: "Luna" },
-  { id: "marte", label: "Marte" },
-];
+import { useI18n } from "@/components/LocaleProvider";
+import { buildDeck, type Planet, type Round } from "@/lib/game";
+import { gamePlace, scoreMessage } from "@/lib/i18n";
 
 function pad(value: number): string {
   return String(value).padStart(2, "0");
@@ -20,6 +16,12 @@ export default function PlanetGame({
   onClose: () => void;
   onShow: (round: Round) => void;
 }) {
+  const { locale, t } = useI18n();
+  const choices: { id: Planet; label: string }[] = [
+    { id: "tierra", label: t("earth") },
+    { id: "luna", label: t("moon") },
+    { id: "marte", label: t("mars") },
+  ];
   const [rounds, setRounds] = useState<Round[]>(() => buildDeck());
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -84,37 +86,37 @@ export default function PlanetGame({
       >
         <div className="flex items-start justify-between gap-4">
           <button type="button" onClick={onClose} className="kicker border border-line px-3 py-2 hover:border-accent hover:text-accent">
-            Cerrar
+            {t("close")}
           </button>
           <p className="font-mono text-2xl leading-none">{pad(score)}/10</p>
         </div>
 
         {finished ? (
           <div className="brackets relative my-auto border border-line px-5 py-8">
-            <p className="kicker text-muted">Resultado</p>
+            <p className="kicker text-muted">{t("result")}</p>
             <p className="font-mono mt-3 text-5xl leading-none">{pad(score)}/10</p>
             <h2 id="game-title" className="display mt-5 text-[clamp(28px,6vw,48px)]">
-              ¿Tierra, Luna o Marte?
+              {t("gameTitle")}
             </h2>
-            <p className="mt-4 max-w-sm text-sm text-ink">{scoreMessage(score)}</p>
+            <p className="mt-4 max-w-sm text-sm text-ink">{scoreMessage(locale, score)}</p>
             <div className="mt-6 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={replay}
                 className="kicker border border-accent px-3 py-2 text-accent"
               >
-                Jugar otra vez
+                {t("playAgain")}
               </button>
               <button type="button" onClick={onClose} className="kicker border border-line px-3 py-2 hover:border-accent">
-                Cerrar
+                {t("close")}
               </button>
             </div>
           </div>
         ) : (
           <div className="mt-6 flex flex-1 flex-col">
-            <p className="kicker text-muted">Ronda {pad(index + 1)} · 10</p>
+            <p className="kicker text-muted">{t("round", { n: pad(index + 1) })}</p>
             <h2 id="game-title" className="display mt-2 text-[clamp(22px,5vw,40px)]">
-              ¿Tierra, Luna o Marte?
+              {t("gameTitle")}
             </h2>
             <div className="brackets relative mx-auto mt-4 aspect-square w-[min(100%,calc(100dvh-250px))] max-w-[440px] border border-line bg-black">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -130,7 +132,7 @@ export default function PlanetGame({
               )}
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2">
-              {CHOICES.map((choice) => {
+              {choices.map((choice) => {
                 const isAnswer = picked !== null && choice.id === round.planet;
                 const isWrong = picked === choice.id && choice.id !== round.planet;
                 return (
@@ -156,18 +158,18 @@ export default function PlanetGame({
             </div>
             {picked ? (
               <div ref={resultRef} className="mt-5">
-                <p className="display text-2xl">{correct ? "Acertaste" : "Fallaste"}</p>
-                <p className="mt-2 text-sm">Es {round.place}.</p>
+                <p className="display text-2xl">{correct ? t("correct") : t("missed")}</p>
+                <p className="mt-2 text-sm">{t("itIs", { place: gamePlace(locale, round.targetId, round.place) })}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => onShow(round)}
                     className="kicker border border-accent px-3 py-2 text-accent"
                   >
-                    Ver en el globo
+                    {t("seeOnGlobe")}
                   </button>
                   <button type="button" onClick={next} className="kicker border border-line px-3 py-2 hover:border-accent">
-                    {index >= rounds.length - 1 ? "Resultado" : "Siguiente"}
+                    {index >= rounds.length - 1 ? t("result") : t("next")}
                   </button>
                 </div>
               </div>

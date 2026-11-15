@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import AboutDialog from "@/components/AboutDialog";
 import AnalogMap from "@/components/AnalogMap";
+import { LanguageToggle, useI18n } from "@/components/LocaleProvider";
 import PlanetGame from "@/components/PlanetGame";
 import PointPanel from "@/components/PointPanel";
 import RadarChart from "@/components/RadarChart";
 import WelcomeScreen from "@/components/WelcomeScreen";
-import { DIMS, LIMITES, SITES, TARGETS, type DimKey, type Site, type Target } from "@/lib/data";
+import { DIMS, SITES, TARGETS, type DimKey, type Site, type Target } from "@/lib/data";
 import { MISSIONS, sameWeights } from "@/lib/missions";
 import {
   cachedPowerPoint,
@@ -30,11 +31,14 @@ import {
   type Candidate,
   type Probe,
 } from "@/lib/point";
+import { dimName, missionName, targetText } from "@/lib/i18n";
 import {
   analogyLists,
+  coveredCategories,
   dimensionDiffs,
   initialWeights,
-  partialScoreLabel,
+  hasCompleteProfile,
+  mismatchedBodyNote,
   scoreSite,
   type Weights,
 } from "@/lib/score";
@@ -42,6 +46,7 @@ import type { Round } from "@/lib/game";
 import type { FlyTarget } from "@/lib/view";
 
 function BodyTag({ body }: { body: string }) {
+  const { t } = useI18n();
   const mars = body.toLowerCase().startsWith("mar");
   return (
     <span className="kicker inline-flex items-center gap-1.5 text-ink">
@@ -49,19 +54,20 @@ function BodyTag({ body }: { body: string }) {
         className="inline-block h-1.5 w-1.5 shrink-0"
         style={{ background: mars ? "var(--marte)" : "var(--luna)" }}
       />
-      {mars ? "MARTE" : "LUNA"}
+      {mars ? t("mars") : t("moon")}
     </span>
   );
 }
 
 function SourceTag({ dim, site, missing }: { dim: DimKey; site?: Site; missing?: boolean }) {
+  const { t } = useI18n();
   if (missing) {
-    return <span className="kicker mt-0.5 block w-fit whitespace-nowrap text-muted">~ Sin dato</span>;
+    return <span className="kicker mt-0.5 block w-fit whitespace-nowrap text-muted">{t("missing")}</span>;
   }
   const nasa = categoryLabel(dim, site) === "Dato NASA";
   return (
     <span className={`kicker mt-0.5 block w-fit whitespace-nowrap ${nasa ? "text-accent" : "text-muted"}`}>
-      {nasa ? "▲ Dato NASA" : "~ Estimado"}
+      {nasa ? t("nasaData") : t("estimate")}
     </span>
   );
 }
@@ -76,6 +82,136 @@ function Mark() {
 
 function scoreInk(score: number) {
   return 0.3 + (0.7 * Math.max(0, Math.min(100, score))) / 100;
+}
+
+function ScoreTicker({ score }: { score: number }) {
+  const [shown, setShown] = useState(score);
+  const [delta, setDelta] = useState<number | null>(null);
+  const fromRef = useRef(score);
+
+  useEffect(() => {
+    const from = fromRef.current;
+    if (from === score) return;
+    const diff = score - from;
+    setDelta(diff);
+    const hide = window.setTimeout(() => setDelta(null), 2000);
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setShown(score);
+      fromRef.current = score;
+      return () => window.clearTimeout(hide);
+    }
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / 300);
+      setShown(Math.round(from + diff * progress));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+      else fromRef.current = score;
+    };
+    frame = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(hide);
+    };
+  }, [score]);
+
+  const change = delta === null || delta === 0 ? null : delta > 0 ? `▲ +${delta}` : `▼ ${delta}`;
+
+  return (
+    <span className="inline-flex items-baseline justify-end gap-1.5 whitespace-nowrap">
+      {change ? <span className="font-mono text-[10px] font-medium text-accent tabular-nums">{change}</span> : null}
+      <span className="font-mono text-sm font-medium text-accent tabular-nums" style={{ opacity: scoreInk(score) }}>
+        {shown}
+      </span>
+    </span>
+  );
+}
+
+function RankedSites({
+  ranked,
+  selectedName,
+  onSelect,
+  noteFor,
+}: {
+  ranked: Array<Site & { score: number }>;
+  selectedName: string | null;
+  onSelect: (site: Site) => void;
+  noteFor?: (site: Site) => string | null;
+}) {
+  const { t } = useI18n();
+  const rootRef = useRef<HTMLOListElement>(null);
+  const rowRefs = useRef(new Map<string, HTMLLIElement>());
+  const tops = useRef(new Map<string, number>());
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const rootRect = root.getBoundingClientRect();
+    if (rootRect.height === 0) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const next = new Map<string, number>();
+    for (const [name, el] of rowRefs.current) {
+      const top = el.getBoundingClientRect().top - rootRect.top;
+      const prev = tops.current.get(name);
+      if (!reduce && prev !== undefined && Math.abs(prev - top) > 0.5) {
+        el.getAnimations().forEach((animation) => animation.cancel());
+        el.animate([{ transform: `translateY(${prev - top}px)` }, { transform: "translateY(0)" }], {
+          duration: 250,
+          easing: "ease-out",
+        });
+      }
+      next.set(name, top);
+    }
+    tops.current = next;
+  });
+
+  return (
+    <ol ref={rootRef}>
+      {ranked.map((site, index) => {
+        const active = site.name === selectedName;
+        const covered = coveredCategories(site);
+        return (
+          <li
+            key={site.name}
+            ref={(node) => {
+              if (node) rowRefs.current.set(site.name, node);
+              else rowRefs.current.delete(site.name);
+            }}
+            className="border-b border-line"
+          >
+            <button
+              type="button"
+              data-site={site.name}
+              onClick={() => onSelect(site)}
+              className={`grid w-full grid-cols-[1.4rem_minmax(0,1fr)_auto] items-center gap-2 px-4 py-2 text-left text-sm sm:px-5 ${
+                active ? "border-l-2 border-l-accent bg-white/[0.04]" : "hover:bg-white/[0.03]"
+              }`}
+            >
+              <span className="font-mono text-[11px] text-muted tabular-nums">{index + 1}</span>
+              <span className="min-w-0 leading-snug">
+                <span>
+                  {site.name}
+                  <SiteMark site={site} className="ml-2" />
+                </span>
+                {covered ? (
+                  <span className="mt-0.5 block font-mono text-[10px] leading-snug tracking-[0.04em] text-muted">
+                    {t("partialScore", covered)}
+                  </span>
+                ) : null}
+                {noteFor?.(site) ? (
+                  <span className="mt-0.5 block font-mono text-[10px] leading-snug tracking-[0.04em] text-muted">
+                    {noteFor(site)}
+                  </span>
+                ) : null}
+              </span>
+              <ScoreTicker score={site.score} />
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 function CountUp({ value }: { value: number }) {
@@ -130,7 +266,9 @@ export default function AnalogFinder() {
   const aboutButtonRef = useRef<HTMLButtonElement>(null);
   const followSelection = useRef(false);
 
+  const { locale, t } = useI18n();
   const target = TARGETS.find((item) => item.id === targetId) ?? TARGETS[0];
+  const targetLabel = targetText(locale, target.id, target);
 
   const mapSites = useMemo(
     () =>
@@ -146,6 +284,15 @@ export default function AnalogFinder() {
     () => mapSites.filter((site) => site.visible).sort((a, b) => b.score - a.score),
     [mapSites],
   );
+  const completeRanked = useMemo(
+    () => ranked.filter((site) => hasCompleteProfile(site) && !mismatchedBodyNote(site, target)),
+    [ranked, target],
+  );
+  const partialRanked = useMemo(
+    () => ranked.filter((site) => !hasCompleteProfile(site) || mismatchedBodyNote(site, target)),
+    [ranked, target],
+  );
+  const bestSite = completeRanked[0] ?? partialRanked[0];
 
   const selected = SITES.find((site) => site.name === selectedName) ?? null;
 
@@ -315,13 +462,14 @@ export default function AnalogFinder() {
                 <h1 className="display text-2xl leading-none">AnalogFinder</h1>
               </div>
             </div>
-            <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <LanguageToggle />
               <button
                 type="button"
                 onClick={() => setGameOpen(true)}
                 className="kicker border border-line px-3 py-2 text-ink transition hover:border-accent hover:text-accent"
               >
-                ¿Tierra, Luna o Marte?
+                {t("gameButton")}
               </button>
               <button
                 ref={aboutButtonRef}
@@ -329,15 +477,13 @@ export default function AnalogFinder() {
                 onClick={() => setAboutOpen(true)}
                 className="kicker border border-line px-3 py-2 text-ink transition hover:border-accent hover:text-accent"
               >
-                Acerca del proyecto
+                {t("aboutButton")}
               </button>
             </div>
           </div>
           <div className="lg:max-w-md lg:text-right">
-            <p className="kicker text-muted">Centro de control de misión</p>
-            <p className="text-sm text-muted">
-              ¿Qué lugar de la Tierra se parece más a la Luna o a Marte… y en qué no?
-            </p>
+            <p className="kicker text-muted">{t("missionControl")}</p>
+            <p className="text-sm text-muted">{t("tagline")}</p>
           </div>
         </div>
         <div className="h-px bg-accent" />
@@ -347,10 +493,11 @@ export default function AnalogFinder() {
         <aside className={`scroll-thin border-line/80 bg-panel/88 min-[1001px]:overflow-y-auto min-[1001px]:border-r ${showWelcome ? "hidden" : ""}`}>
           <div className="space-y-5 p-4 sm:p-5">
             <section>
-              <h2 className="display mb-2 text-2xl text-muted">1 · Elige un objetivo</h2>
+              <h2 className="display mb-2 text-2xl text-muted">{t("pickTarget")}</h2>
               <div className="border-t border-line">
                 {TARGETS.map((item) => {
                   const active = item.id === target.id;
+                  const label = targetText(locale, item.id, item);
                   return (
                     <button
                       key={item.id}
@@ -362,8 +509,8 @@ export default function AnalogFinder() {
                       }`}
                     >
                       <BodyTag body={item.body} />
-                      <span className="mt-1 block text-sm">{item.name}</span>
-                      <small className="mt-0.5 block text-[11px] text-muted">{item.sub}</small>
+                      <span className="mt-1 block text-sm">{label.name}</span>
+                      <small className="mt-0.5 block text-[11px] text-muted">{label.sub}</small>
                     </button>
                   );
                 })}
@@ -371,7 +518,7 @@ export default function AnalogFinder() {
             </section>
 
             <section>
-              <h2 className="display mb-2 text-2xl text-muted">¿Qué quieres probar?</h2>
+              <h2 className="display mb-2 text-2xl text-muted">{t("whatToTest")}</h2>
               <div className="border-t border-line">
                 {MISSIONS.map((mission) => {
                   const active = sameWeights(weights, mission.weights);
@@ -385,7 +532,7 @@ export default function AnalogFinder() {
                         active ? "border-l-2 border-l-accent bg-white/[0.03]" : "hover:bg-white/[0.03]"
                       }`}
                     >
-                      {mission.name}
+                      {missionName(locale, mission.id, mission.name)}
                     </button>
                   );
                 })}
@@ -393,13 +540,26 @@ export default function AnalogFinder() {
             </section>
 
             <section>
-              <h2 className="display mb-1 text-2xl text-muted">2 · ¿Qué te importa más?</h2>
-              <p className="mb-2 text-[11px] text-muted">0 ignora la categoría · 3 la prioriza</p>
+              <div className="mb-1 flex items-start justify-between gap-3">
+                <h2 className="display text-2xl text-muted">{t("whatMatters")}</h2>
+                <button
+                  type="button"
+                  onClick={() => setWeights(initialWeights())}
+                  disabled={DIMS.every((dim) => weights[dim.key] === 1)}
+                  className="kicker mt-1 shrink-0 border border-line px-2 py-1 hover:border-accent hover:text-accent disabled:text-muted"
+                >
+                  {t("reset")}
+                </button>
+              </div>
+              <p className="mb-2 font-mono text-[11px] leading-snug tracking-[0.04em] text-accent">
+                {bestSite ? t("bestNow", { name: bestSite.name, score: bestSite.score }) : t("bestNow", { name: "—", score: "—" })}
+              </p>
+              <p className="mb-2 text-[11px] text-muted">{t("weightHint")}</p>
               <div className="space-y-2.5">
                 {DIMS.map((dim) => (
                   <label key={dim.key} className="grid grid-cols-[minmax(0,1fr)_92px_1.4rem] items-center gap-2 text-xs">
                     <span className="block leading-tight">
-                      {dim.name} <SourceTag dim={dim.key} />
+                      {dimName(locale, dim.key)} <SourceTag dim={dim.key} />
                     </span>
                     <input
                       type="range"
@@ -407,7 +567,7 @@ export default function AnalogFinder() {
                       max={3}
                       step={1}
                       value={weights[dim.key]}
-                      aria-label={dim.name}
+                      aria-label={dimName(locale, dim.key)}
                       onChange={(event) => {
                         const value = Number(event.target.value);
                         setWeights((current) => ({ ...current, [dim.key]: value }));
@@ -424,16 +584,11 @@ export default function AnalogFinder() {
                   onChange={(event) => setOnlyNew(event.target.checked)}
                   className="h-4 w-4 accent-accent"
                 />
-                Solo lugares poco estudiados
+                {t("onlyNew")}
               </label>
             </section>
 
-            <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
-              Versión 0.1 · Frío y aridez de cada lugar se calculan con la climatología de NASA POWER. Las
-              demás categorías (0–10) siguen siendo estimaciones del equipo a partir de la literatura.
-              Próximo paso: calcularlas con datos abiertos de NASA (MODIS, NASADEM, Landsat, LRO
-              LOLA/Diviner, MOLA, CRISM).
-            </p>
+            <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-muted">{t("versionNote")}</p>
           </div>
         </aside>
 
@@ -468,22 +623,22 @@ export default function AnalogFinder() {
               analyzing ? "border-accent bg-panel text-accent" : "border-line bg-panel/90 text-ink hover:border-accent"
             }`}
           >
-            ⌖ Analizar un punto
+            {t("analyzePoint")}
           </button>
           {analyzing ? (
             <p className="pointer-events-none absolute top-28 right-2.5 z-[500] max-w-56 border border-line bg-[#050505] px-3 py-2 text-right font-mono text-[11px] leading-snug tracking-[0.04em] text-ink max-[640px]:top-24 max-[640px]:max-w-40">
-              Da clic en cualquier lugar del planeta
+              {t("clickPlanet")}
             </p>
           ) : null}
           <div className="brackets pointer-events-none absolute top-3 left-3 z-[500] max-w-[min(68%,280px)] border border-line bg-panel/90 px-3 py-2 max-[640px]:max-w-[58%] max-[640px]:px-2.5 max-[640px]:py-1.5">
-            <p className="kicker text-muted">Objetivo</p>
-            <p className="text-sm leading-snug font-medium max-[640px]:text-xs">{target.name}</p>
+            <p className="kicker text-muted">{t("objective")}</p>
+            <p className="text-sm leading-snug font-medium max-[640px]:text-xs">{targetLabel.name}</p>
             <span className="mt-1 inline-flex">
               <BodyTag body={target.body} />
             </span>
           </div>
           <div className="brackets pointer-events-none absolute bottom-10 left-3 z-[500] w-44 border border-line bg-panel/90 px-3 py-2 max-[640px]:right-auto max-[640px]:bottom-9 max-[640px]:w-36 max-[640px]:px-2.5">
-            <p className="kicker mb-2 text-muted">Puntaje</p>
+            <p className="kicker mb-2 text-muted">{t("score")}</p>
             <div
               className="h-1.5 w-full"
               style={{
@@ -504,52 +659,35 @@ export default function AnalogFinder() {
         <aside className={`scroll-thin flex min-h-0 flex-col bg-panel/88 min-[1001px]:h-full min-[1001px]:overflow-hidden min-[1001px]:border-l min-[1001px]:border-line/80 ${showWelcome ? "hidden" : ""}`}>
           <div className="px-4 pt-4 sm:px-5">
             <div className="mb-2 flex items-end justify-between gap-3">
-              <h2 className="display text-2xl text-muted">Lugares más parecidos</h2>
+              <h2 className="display text-2xl text-muted">{t("similarPlaces")}</h2>
               <p className="font-mono text-[11px] text-muted tabular-nums">
-                {ranked.length} de {SITES.length}
+                {t("countOf", { shown: ranked.length, total: SITES.length })}
               </p>
             </div>
           </div>
           <div className="scroll-thin max-h-72 overflow-y-auto border-t border-line min-[1001px]:max-h-[34%]">
-          <ol>
-            {ranked.map((site, index) => {
-              const active = site.name === selectedName;
-              return (
-                <li key={site.name} className="border-b border-line">
-                  <button
-                    type="button"
-                    data-site={site.name}
-                    onClick={() => selectSite(site)}
-                    className={`grid w-full grid-cols-[1.4rem_minmax(0,1fr)_2.6rem] items-center gap-2 px-4 py-2 text-left text-sm sm:px-5 ${
-                      active ? "border-l-2 border-l-accent bg-white/[0.04]" : "hover:bg-white/[0.03]"
-                    }`}
-                  >
-                    <span className="font-mono text-[11px] text-muted tabular-nums">{index + 1}</span>
-                    <span className="min-w-0 leading-snug">
-                      <span>
-                        {site.name}
-                        <SiteMark site={site} className="ml-2" />
-                      </span>
-                      {partialScoreLabel(site) ? (
-                        <span className="mt-0.5 block font-mono text-[10px] leading-snug tracking-[0.04em] text-muted">
-                          {partialScoreLabel(site)}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span
-                      className="text-right font-mono text-sm font-medium text-accent tabular-nums"
-                      style={{ opacity: scoreInk(site.score) }}
-                    >
-                      {site.score}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
+          <RankedSites ranked={completeRanked} selectedName={selectedName} onSelect={selectSite} />
+          {partialRanked.length > 0 ? (
+            <section className="border-t border-line">
+              <h3 className="px-4 pt-3 pb-1 font-mono text-[11px] leading-snug tracking-[0.04em] text-muted sm:px-5">
+                {t("partialSection")}
+              </h3>
+              <RankedSites
+                ranked={partialRanked}
+                selectedName={selectedName}
+                onSelect={selectSite}
+                noteFor={(site) => {
+                  const note = mismatchedBodyNote(site, target);
+                  if (note === "Análogo de Marte") return t("analogOfMars");
+                  if (note === "Análogo de Luna") return t("analogOfMoon");
+                  return null;
+                }}
+              />
+            </section>
+          ) : null}
             {candidates.length > 0 ? (
               <section className="border-t border-line px-4 py-3 sm:px-5">
-                <h3 className="display text-xl text-muted">Mis candidatos</h3>
+                <h3 className="display text-xl text-muted">{t("myCandidates")}</h3>
                 <ul className="mt-2">
                   {candidates.map((candidate) => {
                     const score = climateScore(candidate.climate, target, weights);
@@ -572,7 +710,7 @@ export default function AnalogFinder() {
                           onClick={() => removeCandidate(candidate.id)}
                           className="kicker shrink-0 border border-line px-2 py-1 text-muted hover:border-accent hover:text-accent"
                         >
-                          Borrar
+                          {t("delete")}
                         </button>
                       </li>
                     );
@@ -583,7 +721,7 @@ export default function AnalogFinder() {
           </div>
 
           <div ref={detailRef} className="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-5 sm:px-5">
-            <h2 className="display mb-2 text-2xl text-muted">Detalle</h2>
+            <h2 className="display mb-2 text-2xl text-muted">{t("detail")}</h2>
             {probe ? (
               <PointPanel
                 probe={probe}
@@ -598,7 +736,7 @@ export default function AnalogFinder() {
               <Detail site={selected} target={target} weights={weights} />
             ) : (
               <p className="border border-line px-4 py-8 text-center text-sm text-muted">
-                Haz clic en un lugar del mapa o de la lista.
+                {t("emptyDetail")}
               </p>
             )}
           </div>
@@ -612,12 +750,15 @@ export default function AnalogFinder() {
 }
 
 function Detail({ site, target, weights }: { site: Site; target: Target; weights: Weights }) {
+  const { locale, t } = useI18n();
   const score = scoreSite(site, target, weights);
   const diffs = dimensionDiffs(site, target, weights);
   const known = diffs.filter((item) => !item.missing);
   const { parecidos, fallas } = analogyLists(known);
-  const cuerpo = target.body === "luna" ? "la Luna" : "Marte";
-  const objetivo = target.body === "luna" ? "Luna" : "Marte";
+  const cuerpo = target.body === "luna" ? t("theMoon") : t("mars");
+  const objetivo = target.body === "luna" ? t("moon") : t("mars");
+  const targetLabel = targetText(locale, target.id, target);
+  const covered = coveredCategories(site);
 
   return (
     <article key={`${site.name}-${target.id}`} className="brackets relative overflow-hidden border border-line bg-panel p-4">
@@ -632,20 +773,17 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
       {site.tipoAnalogo ? <p className="mt-2 text-sm text-muted">{site.tipoAnalogo}</p> : null}
       <p className="mt-1 text-xs text-muted">
         {site.where}
-        {site.nuevo && site.estado !== "candidato" ? " · poco estudiado como análogo" : ""}
+        {site.nuevo && site.estado !== "candidato" ? t("littleStudied") : ""}
       </p>
       <p className="mt-3 flex flex-wrap items-end gap-x-2 gap-y-1">
         <CountUp value={score} />
-        <span className="pb-2 font-mono text-sm text-muted tabular-nums">/ 100 de parecido con {target.name}</span>
+        <span className="pb-2 font-mono text-sm text-muted tabular-nums">{t("likeTarget", { name: targetLabel.name })}</span>
       </p>
-      {partialScoreLabel(site) ? (
-        <p className="mt-1 font-mono text-[11px] tracking-[0.04em] text-muted">{partialScoreLabel(site)}</p>
+      {covered ? (
+        <p className="mt-1 font-mono text-[11px] tracking-[0.04em] text-muted">{t("partialScore", covered)}</p>
       ) : null}
       {!site.p && site.similitud ? (
-        <p className="mt-2 text-[11px] leading-relaxed text-muted">
-          Este puntaje es el promedio de la similitud del expediente (terreno, suelo, clima, vida y
-          aislamiento). Todavía no usa las 9 categorías con peso.
-        </p>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted">{t("similarityNote")}</p>
       ) : null}
 
       {site.desc ? <p className="mt-3 text-sm leading-relaxed">{site.desc}</p> : null}
@@ -656,7 +794,7 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
 
       {site.p ? (
         <section className="mt-4">
-          <h4 className="display text-2xl text-muted">Perfil</h4>
+          <h4 className="display text-2xl text-muted">{t("profile")}</h4>
           <RadarChart
             earth={earthProfile(site)}
             target={target.p}
@@ -668,35 +806,35 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
 
       {diffs.length > 0 ? (
         <>
-          <h4 className="display mt-4 text-2xl text-muted">Se parece en</h4>
+          <h4 className="display mt-4 text-2xl text-muted">{t("resemblesIn")}</h4>
           <ul className="ok-list">
             {parecidos.length > 0 ? (
               parecidos.map((item) => (
                 <li key={item.key}>
-                  {item.name} <SourceTag dim={item.key} site={site} missing={item.missing} />
+                  {dimName(locale, item.key)} <SourceTag dim={item.key} site={site} missing={item.missing} />
                 </li>
               ))
             ) : (
-              <li>Ninguna categoría muy cercana</li>
+              <li>{t("noCloseCategory")}</li>
             )}
           </ul>
 
-          <h4 className="display mt-4 text-2xl text-muted">Dónde falla la analogía</h4>
+          <h4 className="display mt-4 text-2xl text-muted">{t("analogyFails")}</h4>
           <ul className="fail-list">
             {fallas.map((item) => (
               <li key={item.key}>
-                {item.name} <SourceTag dim={item.key} site={site} missing={item.missing} />:{" "}
-                {item.earth > item.target ? "mucho más" : "mucho menos"} que en {cuerpo}
+                {dimName(locale, item.key)} <SourceTag dim={item.key} site={site} missing={item.missing} />:{" "}
+                {item.earth > item.target ? t("muchMore") : t("muchLess")} {t("thanOn", { body: cuerpo })}
               </li>
             ))}
-            <li>{LIMITES[target.body]}</li>
+            <li>{target.body === "luna" ? t("limitsMoon") : t("limitsMars")}</li>
           </ul>
         </>
       ) : null}
 
       {site.pruebas && site.pruebas.length > 0 ? null : site.prueba ? (
         <>
-          <h4 className="display mt-4 text-2xl text-muted">Qué se podría probar aquí</h4>
+          <h4 className="display mt-4 text-2xl text-muted">{t("couldTest")}</h4>
           <p className="mt-1 text-sm leading-relaxed">{site.prueba}</p>
         </>
       ) : null}
@@ -705,17 +843,17 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
 
       {diffs.length > 0 ? (
         <>
-          <h4 className="display mt-4 text-2xl text-muted">Comparación por categoría</h4>
+          <h4 className="display mt-4 text-2xl text-muted">{t("byCategory")}</h4>
           <div className="mt-3 space-y-3">
             {diffs.map((item) => (
               <div key={item.key}>
                 <div className="flex items-baseline justify-between gap-3 text-[13px]">
                   <span>
-                    {item.name} {item.missing ? null : <SourceTag dim={item.key} site={site} />}
+                    {dimName(locale, item.key)} {item.missing ? null : <SourceTag dim={item.key} site={site} />}
                   </span>
                 </div>
                 {item.missing ? (
-                  <p className="mt-1 font-mono text-[11px] text-muted">— sin dato</p>
+                  <p className="mt-1 font-mono text-[11px] text-muted">{t("noData")}</p>
                 ) : (
                   <>
                     <div className="mt-1 flex h-2 items-stretch">
@@ -739,11 +877,11 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
           <div className="mt-2 flex gap-4 text-[11px] text-muted">
             <span className="inline-flex items-center gap-1.5">
               <i className="inline-block h-1.5 w-1.5 bg-[#d7d7d7]" />
-              Tierra
+              {t("earth")}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <i className="inline-block h-1.5 w-1.5 bg-accent" />
-              {target.body === "luna" ? "Luna" : "Marte"}
+              {objetivo}
             </span>
           </div>
         </>
@@ -753,30 +891,32 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
 }
 
 function Logistics({ site }: { site: Site }) {
+  const { t } = useI18n();
   const rows = [
-    ["Acceso", site.logistica?.acceso],
-    ["Permisos", site.logistica?.permisos],
-    ["Mejor temporada", site.logistica?.temporada],
-    ["Ciudad más cercana", site.logistica?.ciudad],
+    [t("access"), site.logistica?.acceso],
+    [t("permits"), site.logistica?.permisos],
+    [t("season"), site.logistica?.temporada],
+    [t("nearestCity"), site.logistica?.ciudad],
   ] as const;
 
   return (
     <section className="mt-4">
-      <h4 className="display text-2xl text-muted">Logística de pruebas</h4>
+      <h4 className="display text-2xl text-muted">{t("logistics")}</h4>
       <dl className="mt-2 border-t border-line">
         {rows.map(([label, value]) => (
           <div key={label} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line py-1.5">
             <dt className="text-sm text-muted">{label}</dt>
-            <dd className={`text-right text-sm ${value ? "" : "text-muted"}`}>{value || "Por llenar"}</dd>
+            <dd className={`text-right text-sm ${value ? "" : "text-muted"}`}>{value || t("toFill")}</dd>
           </div>
         ))}
       </dl>
-      <p className="mt-1 text-[11px] text-muted">Permisos: anótalo si el lugar es un área protegida.</p>
+      <p className="mt-1 text-[11px] text-muted">{t("permitsNote")}</p>
     </section>
   );
 }
 
 function Dossier({ site }: { site: Site }) {
+  const { t } = useI18n();
   const hasFacts = site.altitud || site.ubicacion || site.tipoTerreno;
   if (
     !hasFacts &&
@@ -796,41 +936,41 @@ function Dossier({ site }: { site: Site }) {
         <dl className="grid gap-2 text-sm">
           {site.altitud ? (
             <div>
-              <dt className="kicker text-muted">Altitud</dt>
+              <dt className="kicker text-muted">{t("altitude")}</dt>
               <dd className="mt-0.5 leading-relaxed">{site.altitud}</dd>
             </div>
           ) : null}
           {site.ubicacion ? (
             <div>
-              <dt className="kicker text-muted">Ubicación</dt>
+              <dt className="kicker text-muted">{t("location")}</dt>
               <dd className="mt-0.5 leading-relaxed">{site.ubicacion}</dd>
             </div>
           ) : null}
           {site.tipoTerreno ? (
             <div>
-              <dt className="kicker text-muted">Tipo de terreno</dt>
+              <dt className="kicker text-muted">{t("terrainType")}</dt>
               <dd className="mt-0.5 leading-relaxed">{site.tipoTerreno}</dd>
             </div>
           ) : null}
         </dl>
       ) : null}
 
-      <FactList title="Geología" items={site.geologia} />
+      <FactList title={t("geology")} items={site.geologia} />
 
       {site.comparacion ? (
         <section>
-          <h4 className="display text-2xl text-muted">Comparación</h4>
+          <h4 className="display text-2xl text-muted">{t("comparison")}</h4>
           <p className="mt-1 text-sm font-semibold">{site.comparacion.lugar}</p>
           <p className="mt-1 text-sm leading-relaxed">{site.comparacion.explicacion}</p>
         </section>
       ) : null}
 
-      <FactList title="Pruebas que permite" items={site.pruebas} />
-      <FactList title="Limitaciones" items={site.limitaciones} />
+      <FactList title={t("testsAllowed")} items={site.pruebas} />
+      <FactList title={t("limits")} items={site.limitaciones} />
 
       {site.verificacionNasa && site.verificacionNasa.length > 0 ? (
         <section>
-      <h4 className="section-title">Cómo verificarlo con datos de NASA</h4>
+      <h4 className="section-title">{t("howToVerify")}</h4>
           <ul className="mt-1 space-y-1.5 text-sm leading-relaxed">
             {site.verificacionNasa.map((item) => (
               <li key={item.recurso}>
@@ -841,31 +981,34 @@ function Dossier({ site }: { site: Site }) {
         </section>
       ) : null}
 
-      <FactList title="Proyectos recomendados" items={site.proyectos} />
+      <FactList title={t("recommended")} items={site.proyectos} />
     </div>
   );
 }
 
 function SiteMark({ site, className = "" }: { site: Site; className?: string }) {
-  const label = site.estado === "candidato" ? "Candidato" : site.usoNasa ? "NASA" : site.nuevo ? "Nuevo" : null;
-  if (!label) return null;
-  const tone = label === "Nuevo" ? "text-muted" : "text-accent";
+  const { t } = useI18n();
+  const kind = site.estado === "candidato" ? "candidate" : site.usoNasa ? "nasa" : site.nuevo ? "new" : null;
+  if (!kind) return null;
+  const label = kind === "candidate" ? t("candidate") : kind === "nasa" ? "NASA" : t("new");
+  const tone = kind === "new" ? "text-muted" : "text-accent";
   return <span className={`kicker ${tone} ${className}`}>{label}</span>;
 }
 
 function SiteSources({ site }: { site: Site }) {
+  const { t } = useI18n();
   if (!site.usoNasa && !site.fuentes?.length) return null;
   return (
     <>
       {site.usoNasa ? (
         <section className="mt-4">
-          <h4 className="display text-2xl text-muted">Uso de la NASA</h4>
+          <h4 className="display text-2xl text-muted">{t("nasaUse")}</h4>
           <p className="mt-1 text-sm leading-relaxed">{site.usoNasa}</p>
         </section>
       ) : null}
       {site.fuentes && site.fuentes.length > 0 ? (
         <section className="mt-4">
-          <h4 className="display text-2xl text-muted">Fuentes</h4>
+          <h4 className="display text-2xl text-muted">{t("sources")}</h4>
           <ul className="mt-1 list-disc space-y-1 pl-4 text-sm leading-relaxed">
             {site.fuentes.map((item) =>
               typeof item === "string" ? (
@@ -906,19 +1049,20 @@ function FactList({ title, items }: { title: string; items?: string[] }) {
 }
 
 function NasaPower({ site }: { site: Site }) {
+  const { t } = useI18n();
   const climate = nasaRecord(site);
   if (!climate) return null;
   const profile = earthProfile(site);
   const rows = [
-    ["Temperatura media anual", measure(climate.T2M, "°C")],
-    ["Temperatura máxima", measure(climate.T2M_MAX, "°C")],
-    ["Temperatura mínima", measure(climate.T2M_MIN, "°C")],
-    ["Precipitación", measure(climate.PRECTOTCORR, "mm/día")],
+    [t("tempMean"), measure(climate.T2M, "°C")],
+    [t("tempMax"), measure(climate.T2M_MAX, "°C")],
+    [t("tempMin"), measure(climate.T2M_MIN, "°C")],
+    [t("precip"), measure(climate.PRECTOTCORR, t("perDay"))],
   ] as const;
 
   return (
     <section className="mt-4 border-t border-line pt-3">
-      <h4 className="display mt-4 text-2xl text-muted">Datos reales · NASA POWER</h4>
+      <h4 className="display mt-4 text-2xl text-muted">{t("realData")}</h4>
       <dl className="mt-2 border-t border-line">
         {rows.map(([label, value]) => (
           <div key={label} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line py-1.5">
@@ -928,23 +1072,20 @@ function NasaPower({ site }: { site: Site }) {
         ))}
       </dl>
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
-        Frío {profile.frio}/10 con la temperatura media y aridez {profile.aridez}/10 con la precipitación.
-        El valor anual de la máxima es el mes más cálido y el de la mínima, el mes más frío.{" "}
+        {t("climateExplainSite", { frio: profile.frio ?? 0, aridez: profile.aridez ?? 0 })}{" "}
         {DIMS.some((dim) => dim.key !== "frio" && dim.key !== "aridez" && typeof site.p?.[dim.key] === "number")
-          ? "Las demás categorías siguen siendo estimaciones."
-          : "Las demás categorías de este lugar no tienen dato y no entran al puntaje."}
+          ? t("otherStillEstimates")
+          : t("otherNoData")}
       </p>
       <p className="mt-1 text-[11px] leading-relaxed text-muted">
-        Fuente:{" "}
         <a
           href={powerQueryUrl(site)}
           target="_blank"
           rel="noopener noreferrer"
           className="text-accent underline decoration-accent/40 underline-offset-2"
         >
-          NASA POWER
+          {t("powerSourceShort")}
         </a>
-        {" · climatología por punto, comunidad RE."}
       </p>
     </section>
   );

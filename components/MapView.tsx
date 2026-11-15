@@ -15,9 +15,20 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 
 setWorkerUrl("/maplibre-worker");
+import { useI18n } from "@/components/LocaleProvider";
 import { formatCoord } from "@/lib/point";
-import { partialScoreLabel } from "@/lib/score";
+import { coveredCategories } from "@/lib/score";
 import type { MapSite, MapViewProps } from "@/lib/view";
+
+type PopupCopy = {
+  candidate: string;
+  altitude: string;
+  location: string;
+  terrain: string;
+  score: string;
+  more: string;
+  partial: (known: number, total: number) => string;
+};
 
 const GLOBE_ZOOM = 1.6;
 const PLACE_ZOOM = 10;
@@ -118,21 +129,22 @@ function collection(sites: MapSite[], selectedName: string | null) {
   };
 }
 
-function popupHtml(site: MapSite) {
+function popupHtml(site: MapSite, copy: PopupCopy) {
   const candidato =
     site.estado === "candidato"
-      ? `<div style="margin:4px 0 6px;font-size:11px;letter-spacing:0.14em">CANDIDATO</div>`
+      ? `<div style="margin:4px 0 6px;font-size:11px;letter-spacing:0.14em">${esc(copy.candidate)}</div>`
       : site.usoNasa
         ? `<div style="margin:4px 0 6px;font-size:11px;letter-spacing:0.14em">NASA</div>`
         : "";
-  const partial = partialScoreLabel(site);
+  const covered = coveredCategories(site);
+  const partial = covered ? copy.partial(covered.known, covered.total) : "";
   const extra = [
-    site.altitud ? `<div><b>Altitud:</b> ${esc(site.altitud)}</div>` : "",
-    site.ubicacion ? `<div><b>Ubicación:</b> ${esc(site.ubicacion)}</div>` : "",
-    site.tipoTerreno ? `<div><b>Terreno:</b> ${esc(site.tipoTerreno)}</div>` : "",
+    site.altitud ? `<div><b>${esc(copy.altitude)}:</b> ${esc(site.altitud)}</div>` : "",
+    site.ubicacion ? `<div><b>${esc(copy.location)}:</b> ${esc(site.ubicacion)}</div>` : "",
+    site.tipoTerreno ? `<div><b>${esc(copy.terrain)}:</b> ${esc(site.tipoTerreno)}</div>` : "",
   ].join("");
   const more = site.geologia?.length || site.comparacion || site.pruebas?.length
-    ? `<p>La geología, la comparación, las pruebas y las fuentes están en el panel.</p>`
+    ? `<p>${esc(copy.more)}</p>`
     : site.desc
       ? `<p>${esc(site.desc)}</p>`
       : "";
@@ -141,7 +153,7 @@ function popupHtml(site: MapSite) {
     candidato +
     `<div>${esc(site.where)}</div>` +
     extra +
-    `<div><b>Puntaje:</b> ${site.score}</div>` +
+    `<div><b>${esc(copy.score)}</b> ${site.score}</div>` +
     (partial ? `<div style="font-size:11px;letter-spacing:0.04em">${esc(partial)}</div>` : "") +
     more
   );
@@ -170,6 +182,25 @@ export default function MapView({
   const flownSeq = useRef<number | null>(null);
   const syncRef = useRef<() => void>(() => {});
   const flyRef = useRef<() => void>(() => {});
+  const { locale, t } = useI18n();
+  const labelsRef = useRef<PopupCopy>({
+    candidate: "",
+    altitude: "",
+    location: "",
+    terrain: "",
+    score: "",
+    more: "",
+    partial: () => "",
+  });
+  labelsRef.current = {
+    candidate: t("candidate").toUpperCase(),
+    altitude: t("altitude"),
+    location: t("location"),
+    terrain: t("terrain"),
+    score: t("scoreLabel"),
+    more: t("popupMore"),
+    partial: (known, total) => t("partialScore", { known, total }),
+  };
   const propsRef = useRef({ sites, selectedName, flyTarget, onSelect, onAnalyze, onOpenCandidate, accent, analyzing });
   propsRef.current = { sites, selectedName, flyTarget, onSelect, onAnalyze, onOpenCandidate, accent, analyzing };
   const paintRef = useRef<() => void>(() => {});
@@ -247,7 +278,7 @@ export default function MapView({
       popupRef.current?.remove();
       popupRef.current = new Popup({ offset: 12, maxWidth: "260px" })
         .setLngLat([site.lng, site.lat])
-        .setHTML(popupHtml(site))
+        .setHTML(popupHtml(site, labelsRef.current))
         .addTo(mapa);
     };
 
@@ -434,8 +465,8 @@ export default function MapView({
   useEffect(() => {
     syncRef.current();
     const selected = sites.find((site) => site.name === selectedName);
-    if (selected && popupRef.current?.isOpen()) popupRef.current.setHTML(popupHtml(selected));
-  }, [sites, selectedName]);
+    if (selected && popupRef.current?.isOpen()) popupRef.current.setHTML(popupHtml(selected, labelsRef.current));
+  }, [sites, selectedName, locale]);
 
   useEffect(() => {
     flyRef.current();
@@ -456,7 +487,7 @@ export default function MapView({
       const element = document.createElement("div");
       element.className = "point-scan";
       element.innerHTML =
-        '<span class="point-scan-ring" aria-hidden="true"></span><span class="point-scan-label">CONSULTANDO NASA POWER…</span>';
+        `<span class="point-scan-ring" aria-hidden="true"></span><span class="point-scan-label">${t("consulting")}</span>`;
       next.push(new Marker({ element, anchor: "center" }).setLngLat([probe.lng, probe.lat]).addTo(mapa));
     }
     const scanning = probe?.status === "loading" ? `${probe.queryLat},${probe.queryLng}` : "";
@@ -465,7 +496,7 @@ export default function MapView({
       const element = document.createElement("button");
       element.type = "button";
       element.className = "candidate-ring";
-      element.setAttribute("aria-label", `Candidato ${formatCoord(candidate.lat, candidate.lng)}`);
+      element.setAttribute("aria-label", t("candidateAria", { coord: formatCoord(candidate.lat, candidate.lng) }));
       element.addEventListener("click", (event) => {
         event.stopPropagation();
         propsRef.current.onOpenCandidate(candidate.id);
@@ -476,7 +507,7 @@ export default function MapView({
     return () => {
       for (const marker of next) marker.remove();
     };
-  }, [candidates, mapReady, probe]);
+  }, [candidates, mapReady, probe, locale, t]);
 
   function volver() {
     const mapa = mapRef.current;
@@ -526,7 +557,7 @@ export default function MapView({
           closeUp ? "" : "hidden"
         }`}
       >
-        Volver al globo
+        {t("backToGlobe")}
       </button>
       {cursor ? (
         <p className="pointer-events-none absolute bottom-2 left-3 z-10 font-mono text-[11px] tracking-[0.04em] text-[var(--text)] tabular-nums">
