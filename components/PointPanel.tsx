@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/components/LocaleProvider";
 import type { Site, Target } from "@/lib/data";
-import { targetText } from "@/lib/i18n";
+import { siteName, targetText } from "@/lib/i18n";
 import { aridezFromPrecipitation, frioFromTemperature, powerPointUrl } from "@/lib/nasa";
 import {
   climateScore,
@@ -60,7 +60,7 @@ export default function PointPanel({
 }) {
   const { t } = useI18n();
   return (
-    <article className="brackets relative border border-line bg-panel p-4">
+    <article className="relative">
       <h3 className="display text-2xl leading-none">{t("analyzedPoint")}</h3>
       <p className="mt-2 font-mono text-sm tabular-nums">{formatCoord(probe.lat, probe.lng)}</p>
 
@@ -152,7 +152,7 @@ function Ready({
         <section className="mt-4">
           <h4 className="display text-2xl text-muted">{t("nearestKnown")}</h4>
           <p className="mt-2 text-sm">
-            {near.site.name}
+            {siteName(locale, near.site)}
             <span className="font-mono text-muted"> · {formatKm(near.km)}</span>
           </p>
           <button

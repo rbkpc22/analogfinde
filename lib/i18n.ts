@@ -36,6 +36,15 @@ const es = {
   onlyNew: "Solo lugares poco estudiados",
   versionNote:
     "Versión 0.1 · Frío y aridez de cada lugar se calculan con la climatología de NASA POWER. Las demás categorías (0–10) siguen siendo estimaciones del equipo a partir de la literatura. Próximo paso: calcularlas con datos abiertos de NASA (MODIS, NASADEM, Landsat, LRO LOLA/Diviner, MOLA, CRISM).",
+  advancedSettings: "Ajustes avanzados",
+  seeAll: "Ver los {count}",
+  seeLess: "Ver menos",
+  tabSummary: "Resumen",
+  tabNasa: "Datos NASA",
+  tabCompare: "Comparar",
+  tabSources: "Fuentes",
+  minimizePanel: "Minimizar panel",
+  expandPanel: "Mostrar panel",
   similarPlaces: "Lugares más parecidos",
   countOf: "{shown} de {total}",
   partialSection: "DATOS PARCIALES · solo frío y aridez (NASA POWER)",
@@ -218,6 +227,15 @@ const en: { [K in keyof typeof es]: string } = {
   onlyNew: "Only little-studied places",
   versionNote:
     "Version 0.1 · Extreme cold and aridity for each place are calculated from NASA POWER climatology. The other categories (0–10) are still the team's estimates from the literature. Next step: calculate them from open NASA data (MODIS, NASADEM, Landsat, LRO LOLA/Diviner, MOLA, CRISM).",
+  advancedSettings: "Advanced settings",
+  seeAll: "See all {count}",
+  seeLess: "Show less",
+  tabSummary: "Summary",
+  tabNasa: "NASA data",
+  tabCompare: "Compare",
+  tabSources: "Sources",
+  minimizePanel: "Minimize panel",
+  expandPanel: "Show panel",
   similarPlaces: "Most similar places",
   countOf: "{shown} of {total}",
   partialSection: "PARTIAL DATA · cold and aridity only (NASA POWER)",
@@ -456,24 +474,24 @@ export function dimList(locale: Locale): string {
   return (Object.keys(dimEs) as DimKey[]).map((key) => dimName(locale, key)).join(", ");
 }
 
-const targetEs: Record<string, { name: string; sub: string }> = {
-  "luna-sur": { name: "Polo sur lunar (cráter Shackleton)", sub: "Zona candidata para bases de Artemis" },
-  "luna-mare": { name: "Mares lunares (basalto)", sub: "Llanuras volcánicas, posibles tubos de lava" },
-  "marte-jezero": { name: "Cráter Jezero", sub: "Antiguo delta y lago; sitio de Perseverance" },
-  "marte-dunas": { name: "Dunas polares de yeso (Olympia Undae)", sub: "Gran campo de dunas cerca del polo norte" },
-  "marte-tharsis": { name: "Tharsis / Arsia Mons", sub: "Volcanes gigantes y posibles entradas a cuevas" },
-};
+export function pickEn(locale: Locale, es: string | undefined, en: string | undefined): string {
+  if (locale === "en" && en && en.trim()) return en;
+  return es ?? "";
+}
 
-const targetEn: Record<string, { name: string; sub: string }> = {
-  "luna-sur": { name: "Lunar south pole (Shackleton crater)", sub: "Candidate zone for Artemis bases" },
-  "luna-mare": { name: "Lunar maria (basalt)", sub: "Volcanic plains, possible lava tubes" },
-  "marte-jezero": { name: "Jezero crater", sub: "Ancient delta and lake; Perseverance landing site" },
-  "marte-dunas": { name: "Polar gypsum dunes (Olympia Undae)", sub: "Large dune field near the north pole" },
-  "marte-tharsis": { name: "Tharsis / Arsia Mons", sub: "Giant volcanoes and possible cave entrances" },
-};
+export function siteName(locale: Locale, site: { name: string; nameEn?: string }): string {
+  return pickEn(locale, site.name, site.nameEn);
+}
 
-export function targetText(locale: Locale, id: string, fallback: { name: string; sub: string }) {
-  return (locale === "en" ? targetEn : targetEs)[id] ?? fallback;
+export function targetText(
+  locale: Locale,
+  _id: string,
+  target: { name: string; sub: string; nameEn?: string; subEn?: string },
+) {
+  return {
+    name: pickEn(locale, target.name, target.nameEn),
+    sub: pickEn(locale, target.sub, target.subEn),
+  };
 }
 
 const missionEs: Record<string, string> = {

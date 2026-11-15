@@ -2,11 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/components/LocaleProvider";
+import { SITES } from "@/lib/data";
 import { buildDeck, type Planet, type Round } from "@/lib/game";
-import { gamePlace, scoreMessage } from "@/lib/i18n";
+import { gamePlace, scoreMessage, siteName } from "@/lib/i18n";
 
 function pad(value: number): string {
   return String(value).padStart(2, "0");
+}
+
+function roundPlace(locale: "es" | "en", round: Round): string {
+  if (round.siteName) {
+    const site = SITES.find((item) => item.name === round.siteName);
+    if (site) return siteName(locale, site);
+  }
+  return gamePlace(locale, round.targetId, round.place);
 }
 
 export default function PlanetGame({
@@ -159,7 +168,7 @@ export default function PlanetGame({
             {picked ? (
               <div ref={resultRef} className="mt-5">
                 <p className="display text-2xl">{correct ? t("correct") : t("missed")}</p>
-                <p className="mt-2 text-sm">{t("itIs", { place: gamePlace(locale, round.targetId, round.place) })}</p>
+                <p className="mt-2 text-sm">{t("itIs", { place: roundPlace(locale, round) })}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"

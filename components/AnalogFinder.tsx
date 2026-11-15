@@ -31,7 +31,7 @@ import {
   type Candidate,
   type Probe,
 } from "@/lib/point";
-import { dimName, missionName, targetText } from "@/lib/i18n";
+import { dimName, missionName, pickEn, siteName, targetText } from "@/lib/i18n";
 import {
   analogyLists,
   coveredCategories,
@@ -77,7 +77,7 @@ function measure(value: number, unit: string) {
 }
 
 function Mark() {
-  return <img src="/logo.png?v=2" alt="" width={56} height={56} className="h-14 w-14 shrink-0" />;
+  return <img src="/logo.png?v=2" alt="" width={40} height={40} className="h-10 w-10 shrink-0" />;
 }
 
 function scoreInk(score: number) {
@@ -139,7 +139,7 @@ function RankedSites({
   onSelect: (site: Site) => void;
   noteFor?: (site: Site) => string | null;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const rootRef = useRef<HTMLOListElement>(null);
   const rowRefs = useRef(new Map<string, HTMLLIElement>());
   const tops = useRef(new Map<string, number>());
@@ -191,7 +191,7 @@ function RankedSites({
               <span className="font-mono text-[11px] text-muted tabular-nums">{index + 1}</span>
               <span className="min-w-0 leading-snug">
                 <span>
-                  {site.name}
+                  {siteName(locale, site)}
                   <SiteMark site={site} className="ml-2" />
                 </span>
                 {covered ? (
@@ -239,20 +239,16 @@ function CountUp({ value }: { value: number }) {
   );
 }
 
-function openingSelection(): string | null {
-  const target = TARGETS[0];
-  const weights = initialWeights();
-  const ranked = [...SITES].sort(
-    (a, b) => scoreSite(b, target, weights) - scoreSite(a, target, weights),
-  );
-  return ranked[0]?.name ?? null;
-}
-
 export default function AnalogFinder() {
   const [targetId, setTargetId] = useState(TARGETS[0].id);
   const [weights, setWeights] = useState<Weights>(initialWeights);
   const [onlyNew, setOnlyNew] = useState(false);
-  const [selectedName, setSelectedName] = useState<string | null>(openingSelection);
+  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [controlsOpen, setControlsOpen] = useState(true);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [targetMenuOpen, setTargetMenuOpen] = useState(false);
   const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [gameOpen, setGameOpen] = useState(false);
@@ -264,7 +260,9 @@ export default function AnalogFinder() {
   const analyzeSeq = useRef(0);
   const detailRef = useRef<HTMLDivElement>(null);
   const aboutButtonRef = useRef<HTMLButtonElement>(null);
+  const targetMenuRef = useRef<HTMLDivElement>(null);
   const followSelection = useRef(false);
+  const rankedRef = useRef({ complete: [] as Array<Site & { score: number }>, partial: [] as Array<Site & { score: number }> });
 
   const { locale, t } = useI18n();
   const target = TARGETS.find((item) => item.id === targetId) ?? TARGETS[0];
@@ -293,8 +291,12 @@ export default function AnalogFinder() {
     [ranked, target],
   );
   const bestSite = completeRanked[0] ?? partialRanked[0];
+  rankedRef.current = { complete: completeRanked, partial: partialRanked };
 
   const selected = SITES.find((site) => site.name === selectedName) ?? null;
+  const topFive = completeRanked.slice(0, 5);
+  const shownComplete = listOpen ? completeRanked : topFive;
+  const canExpandList = completeRanked.length > 5 || partialRanked.length > 0;
 
   const selectSite = useCallback((site: Site) => {
     followSelection.current = true;
@@ -302,13 +304,23 @@ export default function AnalogFinder() {
     analyzeSeq.current += 1;
     setProbe(null);
     setSelectedName(site.name);
+    setSheetOpen(true);
+    const { complete, partial } = rankedRef.current;
+    const rank = complete.findIndex((item) => item.name === site.name);
+    if (rank >= 5 || partial.some((item) => item.name === site.name)) setListOpen(true);
     setFlyTarget({ lat: site.lat, lng: site.lng, seq: seq.current });
+  }, []);
+
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+    setProbe(null);
   }, []);
 
   const closeWelcome = useCallback(() => setShowWelcome(false), []);
 
   useEffect(() => {
     setCandidates(loadCandidates());
+    if (window.matchMedia("(max-width: 767px)").matches) setControlsOpen(false);
   }, []);
 
   useEffect(() => {
@@ -319,13 +331,27 @@ export default function AnalogFinder() {
   }, [probe]);
 
   useEffect(() => {
-    if (!analyzing) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !aboutOpen && !gameOpen) setAnalyzing(false);
+      if (event.key !== "Escape" || aboutOpen || gameOpen) return;
+      if (sheetOpen) {
+        setSheetOpen(false);
+        setProbe(null);
+        return;
+      }
+      if (analyzing) setAnalyzing(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [aboutOpen, analyzing, gameOpen]);
+  }, [aboutOpen, analyzing, gameOpen, sheetOpen]);
+
+  useEffect(() => {
+    if (!targetMenuOpen) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!targetMenuRef.current?.contains(event.target as Node)) setTargetMenuOpen(false);
+    };
+    window.addEventListener("pointerdown", onPointer);
+    return () => window.removeEventListener("pointerdown", onPointer);
+  }, [targetMenuOpen]);
 
   const analyzePoint = useCallback((lat: number, lng: number) => {
     const queryLat = roundCoord(lat);
@@ -334,6 +360,7 @@ export default function AnalogFinder() {
     const cached = cachedPowerPoint(queryLat, queryLng);
     if (cached) {
       setSelectedName(null);
+      setSheetOpen(true);
       setProbe({
         status: "ready",
         lat,
@@ -346,6 +373,7 @@ export default function AnalogFinder() {
       return;
     }
     setSelectedName(null);
+    setSheetOpen(true);
     setProbe({ status: "loading", lat, lng, queryLat, queryLng });
     fetchPowerPoint(queryLat, queryLng)
       .then((sample) => {
@@ -375,6 +403,7 @@ export default function AnalogFinder() {
       elevation: candidate.elevation,
     });
     setSelectedName(null);
+    setSheetOpen(true);
     setProbe({
       status: "ready",
       lat: candidate.lat,
@@ -449,154 +478,53 @@ export default function AnalogFinder() {
 
   return (
     <div
-      className="starfield flex h-dvh flex-col overflow-hidden max-[1000px]:h-auto max-[1000px]:min-h-dvh max-[1000px]:overflow-x-hidden max-[1000px]:overflow-y-visible"
+      className="starfield flex h-dvh flex-col overflow-hidden"
       style={{ "--accent": target.body === "luna" ? "#E6EEF5" : "#FF5A1F" } as React.CSSProperties}
     >
-      <header className={`relative z-20 border-b border-line bg-panel/95 ${showWelcome ? "hidden" : ""}`}>
-        <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <Mark />
-              <div className="min-w-0">
-                <p className="kicker truncate text-muted">NASA Space Apps Challenge 2026</p>
-                <h1 className="display text-2xl leading-none">AnalogFinder</h1>
-              </div>
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-              <LanguageToggle />
-              <button
-                type="button"
-                onClick={() => setGameOpen(true)}
-                className="kicker border border-line px-3 py-2 text-ink transition hover:border-accent hover:text-accent"
-              >
-                {t("gameButton")}
-              </button>
-              <button
-                ref={aboutButtonRef}
-                type="button"
-                onClick={() => setAboutOpen(true)}
-                className="kicker border border-line px-3 py-2 text-ink transition hover:border-accent hover:text-accent"
-              >
-                {t("aboutButton")}
-              </button>
-            </div>
+      <header className={`relative z-50 border-b border-line bg-panel/95 ${showWelcome ? "hidden" : ""}`}>
+        <div className="flex items-center gap-2 px-3 py-2">
+          <div className="flex shrink-0 items-center gap-2">
+            <Mark />
+            <h1 className="display text-xl leading-none">AnalogFinder</h1>
           </div>
-          <div className="lg:max-w-md lg:text-right">
-            <p className="kicker text-muted">{t("missionControl")}</p>
-            <p className="text-sm text-muted">{t("tagline")}</p>
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-2 overflow-x-auto">
+            <button
+              type="button"
+              aria-pressed={analyzing}
+              onClick={() => setAnalyzing((current) => !current)}
+              className={`kicker shrink-0 border px-3 py-2 ${
+                analyzing ? "border-accent text-accent" : "border-line text-ink hover:border-accent hover:text-accent"
+              }`}
+            >
+              {t("analyzePoint")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setGameOpen(true)}
+              className="kicker shrink-0 border border-line px-3 py-2 text-ink transition hover:border-accent hover:text-accent"
+            >
+              {t("gameButton")}
+            </button>
+            <LanguageToggle />
+            <button
+              ref={aboutButtonRef}
+              type="button"
+              onClick={() => setAboutOpen(true)}
+              className="kicker shrink-0 border border-line px-3 py-2 text-ink transition hover:border-accent hover:text-accent"
+            >
+              {t("aboutButton")}
+            </button>
           </div>
         </div>
         <div className="h-px bg-accent" />
       </header>
 
-      <div className="relative z-10 grid min-h-0 flex-1 grid-cols-1 min-[1001px]:grid-cols-[minmax(280px,340px)_minmax(0,1fr)_minmax(300px,400px)]">
-        <aside className={`scroll-thin border-line/80 bg-panel/88 min-[1001px]:overflow-y-auto min-[1001px]:border-r ${showWelcome ? "hidden" : ""}`}>
-          <div className="space-y-5 p-4 sm:p-5">
-            <section>
-              <h2 className="display mb-2 text-2xl text-muted">{t("pickTarget")}</h2>
-              <div className="border-t border-line">
-                {TARGETS.map((item) => {
-                  const active = item.id === target.id;
-                  const label = targetText(locale, item.id, item);
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setTargetId(item.id)}
-                      className={`block w-full border-b border-line px-2 py-2.5 text-left ${
-                        active ? "border-l-2 border-l-accent bg-white/[0.03]" : "hover:bg-white/[0.03]"
-                      }`}
-                    >
-                      <BodyTag body={item.body} />
-                      <span className="mt-1 block text-sm">{label.name}</span>
-                      <small className="mt-0.5 block text-[11px] text-muted">{label.sub}</small>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section>
-              <h2 className="display mb-2 text-2xl text-muted">{t("whatToTest")}</h2>
-              <div className="border-t border-line">
-                {MISSIONS.map((mission) => {
-                  const active = sameWeights(weights, mission.weights);
-                  return (
-                    <button
-                      key={mission.id}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setWeights(mission.weights)}
-                      className={`block w-full border-b border-line px-2 py-2.5 text-left text-sm ${
-                        active ? "border-l-2 border-l-accent bg-white/[0.03]" : "hover:bg-white/[0.03]"
-                      }`}
-                    >
-                      {missionName(locale, mission.id, mission.name)}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section>
-              <div className="mb-1 flex items-start justify-between gap-3">
-                <h2 className="display text-2xl text-muted">{t("whatMatters")}</h2>
-                <button
-                  type="button"
-                  onClick={() => setWeights(initialWeights())}
-                  disabled={DIMS.every((dim) => weights[dim.key] === 1)}
-                  className="kicker mt-1 shrink-0 border border-line px-2 py-1 hover:border-accent hover:text-accent disabled:text-muted"
-                >
-                  {t("reset")}
-                </button>
-              </div>
-              <p className="mb-2 font-mono text-[11px] leading-snug tracking-[0.04em] text-accent">
-                {bestSite ? t("bestNow", { name: bestSite.name, score: bestSite.score }) : t("bestNow", { name: "—", score: "—" })}
-              </p>
-              <p className="mb-2 text-[11px] text-muted">{t("weightHint")}</p>
-              <div className="space-y-2.5">
-                {DIMS.map((dim) => (
-                  <label key={dim.key} className="grid grid-cols-[minmax(0,1fr)_92px_1.4rem] items-center gap-2 text-xs">
-                    <span className="block leading-tight">
-                      {dimName(locale, dim.key)} <SourceTag dim={dim.key} />
-                    </span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={3}
-                      step={1}
-                      value={weights[dim.key]}
-                      aria-label={dimName(locale, dim.key)}
-                      onChange={(event) => {
-                        const value = Number(event.target.value);
-                        setWeights((current) => ({ ...current, [dim.key]: value }));
-                      }}
-                    />
-                    <b className="text-right font-mono text-sm text-accent tabular-nums">{weights[dim.key]}</b>
-                  </label>
-                ))}
-              </div>
-              <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={onlyNew}
-                  onChange={(event) => setOnlyNew(event.target.checked)}
-                  className="h-4 w-4 accent-accent"
-                />
-                {t("onlyNew")}
-              </label>
-            </section>
-
-            <p className="border-t border-line pt-3 text-[11px] leading-relaxed text-muted">{t("versionNote")}</p>
-          </div>
-        </aside>
-
+      <div className="relative z-10 min-h-0 flex-1">
         <section
           className={
             showWelcome
               ? "intro-globe fixed top-1/2 z-[60] -translate-y-1/2 max-md:left-1/2 max-md:-translate-x-1/2 md:left-[70%] md:-translate-x-1/2"
-              : "relative h-[52vh] min-h-[280px] border-line/80 min-[1001px]:h-full min-[1001px]:min-h-0 max-[1000px]:border-y sm:h-[58vh] sm:min-h-[320px]"
+              : "map-stage absolute inset-0"
           }
           style={showWelcome ? { width: "min(100dvh, 100vw)", height: "min(100dvh, 100vw)" } : undefined}
         >
@@ -612,135 +540,296 @@ export default function AnalogFinder() {
             onAnalyze={(lat, lng) => analyzePoint(lat, lng)}
             onOpenCandidate={openCandidate}
           />
-          <div className="pointer-events-none absolute inset-0 z-[400]" />
-          {showWelcome ? null : (
-            <>
-          <button
-            type="button"
-            aria-pressed={analyzing}
-            onClick={() => setAnalyzing((current) => !current)}
-            className={`absolute top-16 right-2.5 z-[500] border px-3 py-2 font-mono text-[11px] tracking-[0.08em] uppercase max-[640px]:top-14 max-[640px]:px-2 ${
-              analyzing ? "border-accent bg-panel text-accent" : "border-line bg-panel/90 text-ink hover:border-accent"
-            }`}
-          >
-            {t("analyzePoint")}
-          </button>
-          {analyzing ? (
-            <p className="pointer-events-none absolute top-28 right-2.5 z-[500] max-w-56 border border-line bg-[#050505] px-3 py-2 text-right font-mono text-[11px] leading-snug tracking-[0.04em] text-ink max-[640px]:top-24 max-[640px]:max-w-40">
-              {t("clickPlanet")}
-            </p>
-          ) : null}
-          <div className="brackets pointer-events-none absolute top-3 left-3 z-[500] max-w-[min(68%,280px)] border border-line bg-panel/90 px-3 py-2 max-[640px]:max-w-[58%] max-[640px]:px-2.5 max-[640px]:py-1.5">
-            <p className="kicker text-muted">{t("objective")}</p>
-            <p className="text-sm leading-snug font-medium max-[640px]:text-xs">{targetLabel.name}</p>
-            <span className="mt-1 inline-flex">
-              <BodyTag body={target.body} />
-            </span>
-          </div>
-          <div className="brackets pointer-events-none absolute bottom-10 left-3 z-[500] w-44 border border-line bg-panel/90 px-3 py-2 max-[640px]:right-auto max-[640px]:bottom-9 max-[640px]:w-36 max-[640px]:px-2.5">
-            <p className="kicker mb-2 text-muted">{t("score")}</p>
-            <div
-              className="h-1.5 w-full"
-              style={{
-                background: "linear-gradient(90deg, color-mix(in srgb, var(--accent) 30%, transparent), var(--accent))",
-              }}
-            />
-            <div className="relative mt-1 h-4 font-mono text-[11px] text-muted tabular-nums">
-              <span className="absolute left-0">0</span>
-              <span className="absolute left-1/2 -translate-x-1/2">50</span>
-              <span className="absolute left-[80%] -translate-x-1/2">80</span>
-              <span className="absolute right-0">100</span>
-            </div>
-          </div>
-            </>
-          )}
         </section>
 
-        <aside className={`scroll-thin flex min-h-0 flex-col bg-panel/88 min-[1001px]:h-full min-[1001px]:overflow-hidden min-[1001px]:border-l min-[1001px]:border-line/80 ${showWelcome ? "hidden" : ""}`}>
-          <div className="px-4 pt-4 sm:px-5">
-            <div className="mb-2 flex items-end justify-between gap-3">
-              <h2 className="display text-2xl text-muted">{t("similarPlaces")}</h2>
-              <p className="font-mono text-[11px] text-muted tabular-nums">
-                {t("countOf", { shown: ranked.length, total: SITES.length })}
+        {showWelcome ? null : (
+          <>
+            {analyzing ? (
+              <p className="pointer-events-none absolute top-3 left-1/2 z-20 max-w-xs -translate-x-1/2 border border-line bg-panel/90 px-3 py-2 text-center font-mono text-[11px] leading-snug tracking-[0.04em]">
+                {t("clickPlanet")}
               </p>
-            </div>
-          </div>
-          <div className="scroll-thin max-h-72 overflow-y-auto border-t border-line min-[1001px]:max-h-[34%]">
-          <RankedSites ranked={completeRanked} selectedName={selectedName} onSelect={selectSite} />
-          {partialRanked.length > 0 ? (
-            <section className="border-t border-line">
-              <h3 className="px-4 pt-3 pb-1 font-mono text-[11px] leading-snug tracking-[0.04em] text-muted sm:px-5">
-                {t("partialSection")}
-              </h3>
-              <RankedSites
-                ranked={partialRanked}
-                selectedName={selectedName}
-                onSelect={selectSite}
-                noteFor={(site) => {
-                  const note = mismatchedBodyNote(site, target);
-                  if (note === "Análogo de Marte") return t("analogOfMars");
-                  if (note === "Análogo de Luna") return t("analogOfMoon");
-                  return null;
+            ) : null}
+
+            <div className="pointer-events-none absolute bottom-3 left-3 z-20 w-32 max-md:bottom-[47vh]">
+              <div
+                className="h-1 w-full"
+                style={{
+                  background: "linear-gradient(90deg, color-mix(in srgb, var(--accent) 30%, transparent), var(--accent))",
                 }}
               />
-            </section>
-          ) : null}
-            {candidates.length > 0 ? (
-              <section className="border-t border-line px-4 py-3 sm:px-5">
-                <h3 className="display text-xl text-muted">{t("myCandidates")}</h3>
-                <ul className="mt-2">
-                  {candidates.map((candidate) => {
-                    const score = climateScore(candidate.climate, target, weights);
-                    const active =
-                      probe?.status === "ready" &&
-                      probe.queryLat === candidate.queryLat &&
-                      probe.queryLng === candidate.queryLng;
-                    return (
-                      <li key={candidate.id} className="flex items-center gap-2 border-b border-line py-2">
-                        <button
-                          type="button"
-                          onClick={() => openCandidate(candidate.id)}
-                          className={`min-w-0 flex-1 text-left ${active ? "text-accent" : ""}`}
-                        >
-                          <span className="block font-mono text-[11px] tabular-nums">{formatCoord(candidate.lat, candidate.lng)}</span>
-                          <span className="font-mono text-sm tabular-nums">{score === null ? "—" : score}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeCandidate(candidate.id)}
-                          className="kicker shrink-0 border border-line px-2 py-1 text-muted hover:border-accent hover:text-accent"
-                        >
-                          {t("delete")}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            ) : null}
-          </div>
+              <div className="relative mt-0.5 h-3 font-mono text-[10px] text-muted tabular-nums">
+                <span className="absolute left-0">0</span>
+                <span className="absolute left-1/2 -translate-x-1/2">50</span>
+                <span className="absolute left-[80%] -translate-x-1/2">80</span>
+                <span className="absolute right-0">100</span>
+              </div>
+            </div>
 
-          <div ref={detailRef} className="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-5 sm:px-5">
-            <h2 className="display mb-2 text-2xl text-muted">{t("detail")}</h2>
-            {probe ? (
-              <PointPanel
-                probe={probe}
-                target={target}
-                weights={weights}
-                saved={candidates.some((item) => item.id === cacheKey(probe.queryLat, probe.queryLng))}
-                onRetry={() => analyzePoint(probe.lat, probe.lng)}
-                onSave={saveProbe}
-                onGoToSite={selectSite}
-              />
-            ) : selected ? (
-              <Detail site={selected} target={target} weights={weights} />
+            {controlsOpen ? (
+              <aside className="brackets absolute z-[35] flex min-h-0 flex-col overflow-hidden border border-line bg-panel/90 max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[72vh] max-md:w-full md:top-3 md:bottom-16 md:left-3 md:w-[320px]">
+                <div className="flex justify-end px-2 pt-2">
+                  <button
+                    type="button"
+                    aria-label={t("minimizePanel")}
+                    onClick={() => setControlsOpen(false)}
+                    className="kicker border border-line px-2 py-1 text-muted hover:border-accent hover:text-accent"
+                  >
+                    —
+                  </button>
+                </div>
+                <div className="scroll-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-3 pb-3">
+                  <section>
+                    <h2 className="display mb-2 text-2xl text-muted">{t("objective")}</h2>
+                    <div ref={targetMenuRef}>
+                      <button
+                        type="button"
+                        aria-expanded={targetMenuOpen}
+                        onClick={() => setTargetMenuOpen((open) => !open)}
+                        className="block w-full border border-line px-2 py-2 text-left hover:border-accent"
+                      >
+                        <span className="flex items-start justify-between gap-2">
+                          <BodyTag body={target.body} />
+                          <span aria-hidden="true" className="text-muted">{targetMenuOpen ? "▴" : "▾"}</span>
+                        </span>
+                        <span className="mt-1 block text-sm">{targetLabel.name}</span>
+                        <small className="mt-0.5 block text-[11px] text-muted">{targetLabel.sub}</small>
+                      </button>
+                      {targetMenuOpen ? (
+                        <div className="border border-t-0 border-line">
+                          {TARGETS.map((item) => {
+                            const active = item.id === target.id;
+                            const label = targetText(locale, item.id, item);
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() => {
+                                  setTargetId(item.id);
+                                  setTargetMenuOpen(false);
+                                }}
+                                className={`block w-full border-t border-line px-2 py-2 text-left ${
+                                  active ? "bg-white/[0.04]" : "hover:bg-white/[0.03]"
+                                }`}
+                              >
+                                <BodyTag body={item.body} />
+                                <span className="mt-1 block text-sm">{label.name}</span>
+                                <small className="mt-0.5 block text-[11px] text-muted">{label.sub}</small>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  </section>
+
+                  <section>
+                    <h2 className="display mb-2 text-2xl text-muted">{t("whatToTest")}</h2>
+                    <div className="grid grid-cols-6 gap-1.5">
+                      {MISSIONS.map((mission, index) => {
+                        const active = sameWeights(weights, mission.weights);
+                        return (
+                          <button
+                            key={mission.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => setWeights(mission.weights)}
+                            className={`${index < 3 ? "col-span-2" : "col-span-3"} border px-2 py-2 text-left text-xs leading-snug ${
+                              active ? "border-accent text-accent" : "border-line hover:border-accent"
+                            }`}
+                          >
+                            {missionName(locale, mission.id, mission.name)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  <section>
+                    <button
+                      type="button"
+                      aria-expanded={advancedOpen}
+                      onClick={() => setAdvancedOpen((open) => !open)}
+                      className="kicker w-full border border-line px-2 py-2 text-left hover:border-accent hover:text-accent"
+                    >
+                      {t("advancedSettings")} {advancedOpen ? "▴" : "▾"}
+                    </button>
+                    {advancedOpen ? (
+                      <div className="mt-3">
+                        <div className="mb-2 flex items-start justify-between gap-2">
+                          <p className="font-mono text-[11px] leading-snug tracking-[0.04em] text-accent">
+                            {bestSite ? t("bestNow", { name: siteName(locale, bestSite), score: bestSite.score }) : t("bestNow", { name: "—", score: "—" })}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setWeights(initialWeights())}
+                            disabled={DIMS.every((dim) => weights[dim.key] === 1)}
+                            className="kicker shrink-0 border border-line px-2 py-1 hover:border-accent hover:text-accent disabled:text-muted"
+                          >
+                            {t("reset")}
+                          </button>
+                        </div>
+                        <p className="mb-2 text-[11px] text-muted">{t("weightHint")}</p>
+                        <div className="space-y-2.5">
+                          {DIMS.map((dim) => (
+                            <label key={dim.key} className="grid grid-cols-[minmax(0,1fr)_72px_1.2rem] items-center gap-2 text-xs">
+                              <span className="block leading-tight">
+                                {dimName(locale, dim.key)} <SourceTag dim={dim.key} />
+                              </span>
+                              <input
+                                type="range"
+                                min={0}
+                                max={3}
+                                step={1}
+                                value={weights[dim.key]}
+                                aria-label={dimName(locale, dim.key)}
+                                onChange={(event) => {
+                                  const value = Number(event.target.value);
+                                  setWeights((current) => ({ ...current, [dim.key]: value }));
+                                }}
+                              />
+                              <b className="text-right font-mono text-sm text-accent tabular-nums">{weights[dim.key]}</b>
+                            </label>
+                          ))}
+                        </div>
+                        <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={onlyNew}
+                            onChange={(event) => setOnlyNew(event.target.checked)}
+                            className="h-4 w-4 accent-accent"
+                          />
+                          {t("onlyNew")}
+                        </label>
+                      </div>
+                    ) : null}
+                  </section>
+                </div>
+              </aside>
             ) : (
-              <p className="border border-line px-4 py-8 text-center text-sm text-muted">
-                {t("emptyDetail")}
-              </p>
+              <button
+                type="button"
+                aria-label={t("expandPanel")}
+                onClick={() => setControlsOpen(true)}
+                className="brackets absolute top-3 left-3 z-[35] flex h-10 w-10 items-center justify-center border border-line bg-panel/90 text-lg text-ink hover:border-accent hover:text-accent"
+              >
+                ≡
+              </button>
             )}
-          </div>
-        </aside>
+
+            <aside className={`brackets absolute z-30 flex min-h-0 flex-col overflow-hidden border border-line bg-panel/90 max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[46vh] max-md:w-full md:top-3 md:right-3 md:bottom-3 md:w-[320px] ${sheetOpen ? "max-md:hidden" : ""}`}>
+              <div className="px-3 pt-3">
+                <h2 className="display text-2xl text-muted">{t("similarPlaces")}</h2>
+              </div>
+              <div className="scroll-thin mt-2 min-h-0 flex-1 overflow-y-auto border-t border-line">
+                <RankedSites ranked={shownComplete} selectedName={selectedName} onSelect={selectSite} />
+                {listOpen && partialRanked.length > 0 ? (
+                  <section className="border-t border-line">
+                    <h3 className="px-4 pt-3 pb-1 font-mono text-[11px] leading-snug tracking-[0.04em] text-muted">
+                      {t("partialSection")}
+                    </h3>
+                    <RankedSites
+                      ranked={partialRanked}
+                      selectedName={selectedName}
+                      onSelect={selectSite}
+                      noteFor={(site) => {
+                        const note = mismatchedBodyNote(site, target);
+                        if (note === "Análogo de Marte") return t("analogOfMars");
+                        if (note === "Análogo de Luna") return t("analogOfMoon");
+                        return null;
+                      }}
+                    />
+                  </section>
+                ) : null}
+                {candidates.length > 0 ? (
+                  <section className="border-t border-line px-3 py-3">
+                    <h3 className="display text-xl text-muted">{t("myCandidates")}</h3>
+                    <ul className="mt-2">
+                      {candidates.map((candidate) => {
+                        const score = climateScore(candidate.climate, target, weights);
+                        const active =
+                          probe?.status === "ready" &&
+                          probe.queryLat === candidate.queryLat &&
+                          probe.queryLng === candidate.queryLng;
+                        return (
+                          <li key={candidate.id} className="flex items-center gap-2 border-b border-line py-2">
+                            <button
+                              type="button"
+                              onClick={() => openCandidate(candidate.id)}
+                              className={`min-w-0 flex-1 text-left ${active ? "text-accent" : ""}`}
+                            >
+                              <span className="block font-mono text-[11px] tabular-nums">{formatCoord(candidate.lat, candidate.lng)}</span>
+                              <span className="font-mono text-sm tabular-nums">{score === null ? "—" : score}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeCandidate(candidate.id)}
+                              className="kicker shrink-0 border border-line px-2 py-1 text-muted hover:border-accent hover:text-accent"
+                            >
+                              {t("delete")}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                ) : null}
+              </div>
+              {canExpandList ? (
+                <button
+                  type="button"
+                  aria-expanded={listOpen}
+                  onClick={() => setListOpen((open) => !open)}
+                  className="kicker border-t border-line px-3 py-2 text-left text-accent hover:bg-white/[0.03]"
+                >
+                  {listOpen ? t("seeLess") : t("seeAll", { count: ranked.length })}
+                </button>
+              ) : null}
+            </aside>
+
+            {selected || probe ? (
+              <aside
+                ref={detailRef}
+                role="dialog"
+                aria-modal="false"
+                aria-hidden={!sheetOpen}
+                className={`sheet-slide brackets absolute z-40 flex min-h-0 flex-col overflow-hidden border border-line bg-panel/90 max-md:inset-x-0 max-md:bottom-0 max-md:max-h-[88vh] max-md:w-full md:top-3 md:right-3 md:bottom-3 md:w-[420px] ${
+                  sheetOpen
+                    ? "translate-x-0 translate-y-0"
+                    : "pointer-events-none max-md:translate-x-0 max-md:translate-y-full md:translate-x-[calc(100%+1rem)] md:translate-y-0"
+                }`}
+              >
+                <div className="flex justify-end px-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeSheet}
+                    aria-label={t("close")}
+                    className="kicker border border-line px-2 py-1 text-muted hover:border-accent hover:text-accent"
+                  >
+                    X
+                  </button>
+                </div>
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  {probe ? (
+                    <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+                      <PointPanel
+                        probe={probe}
+                        target={target}
+                        weights={weights}
+                        saved={candidates.some((item) => item.id === cacheKey(probe.queryLat, probe.queryLng))}
+                        onRetry={() => analyzePoint(probe.lat, probe.lng)}
+                        onSave={saveProbe}
+                        onGoToSite={selectSite}
+                      />
+                    </div>
+                  ) : selected ? (
+                    <Detail site={selected} target={target} weights={weights} />
+                  ) : null}
+                </div>
+              </aside>
+            ) : null}
+          </>
+        )}
       </div>
       {showWelcome ? <WelcomeScreen onDone={closeWelcome} siteCount={SITES.length} /> : null}
       {aboutOpen ? <AboutDialog onClose={closeAbout} /> : null}
@@ -759,11 +848,19 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
   const objetivo = target.body === "luna" ? t("moon") : t("mars");
   const targetLabel = targetText(locale, target.id, target);
   const covered = coveredCategories(site);
+  const [tab, setTab] = useState<"resumen" | "nasa" | "comparar" | "fuentes">("resumen");
+  const tabs = [
+    ["resumen", t("tabSummary")],
+    ["nasa", t("tabNasa")],
+    ["comparar", t("tabCompare")],
+    ["fuentes", t("tabSources")],
+  ] as const;
+  const tests = locale === "en" && site.pruebasEn?.length ? site.pruebasEn : site.pruebas;
 
   return (
-    <article key={`${site.name}-${target.id}`} className="brackets relative overflow-hidden border border-line bg-panel p-4">
-      <span className="scan-line" aria-hidden="true" />
-      <h3 className="display text-2xl leading-none">{site.name}</h3>
+    <article key={`${site.name}-${target.id}`} className="flex h-full min-h-0 flex-col">
+      <div className="px-3 pt-1">
+      <h3 className="display text-2xl leading-none">{siteName(locale, site)}</h3>
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <SiteMark site={site} />
         {site.analogoDe?.map((body) => (
@@ -772,10 +869,28 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
       </div>
       {site.tipoAnalogo ? <p className="mt-2 text-sm text-muted">{site.tipoAnalogo}</p> : null}
       <p className="mt-1 text-xs text-muted">
-        {site.where}
+        {pickEn(locale, site.where, site.whereEn)}
         {site.nuevo && site.estado !== "candidato" ? t("littleStudied") : ""}
       </p>
-      <p className="mt-3 flex flex-wrap items-end gap-x-2 gap-y-1">
+      </div>
+      <div role="tablist" className="mt-3 flex border-y border-line">
+        {tabs.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={`kicker flex-1 px-1 py-2 ${tab === id ? "bg-white/10 text-accent" : "text-muted hover:text-ink"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      {tab === "resumen" ? (
+        <>
+      <p className="flex flex-wrap items-end gap-x-2 gap-y-1">
         <CountUp value={score} />
         <span className="pb-2 font-mono text-sm text-muted tabular-nums">{t("likeTarget", { name: targetLabel.name })}</span>
       </p>
@@ -785,23 +900,8 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
       {!site.p && site.similitud ? (
         <p className="mt-2 text-[11px] leading-relaxed text-muted">{t("similarityNote")}</p>
       ) : null}
-
-      {site.desc ? <p className="mt-3 text-sm leading-relaxed">{site.desc}</p> : null}
-      <SiteSources site={site} />
-
-      <Dossier site={site} />
-      <Logistics site={site} />
-
-      {site.p ? (
-        <section className="mt-4">
-          <h4 className="display text-2xl text-muted">{t("profile")}</h4>
-          <RadarChart
-            earth={earthProfile(site)}
-            target={target.p}
-            targetName={objetivo}
-            known={DIMS.map((dim) => categoryKnown(site, dim.key))}
-          />
-        </section>
+      {pickEn(locale, site.desc, site.descEn) ? (
+        <p className="mt-3 text-sm leading-relaxed">{pickEn(locale, site.desc, site.descEn)}</p>
       ) : null}
 
       {diffs.length > 0 ? (
@@ -832,18 +932,42 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
         </>
       ) : null}
 
-      {site.pruebas && site.pruebas.length > 0 ? null : site.prueba ? (
+      {tests && tests.length > 0 ? (
+        <div className="mt-4">
+          <FactList title={t("couldTest")} items={tests} />
+        </div>
+      ) : pickEn(locale, site.prueba, site.pruebaEn) ? (
         <>
           <h4 className="display mt-4 text-2xl text-muted">{t("couldTest")}</h4>
-          <p className="mt-1 text-sm leading-relaxed">{site.prueba}</p>
+          <p className="mt-1 text-sm leading-relaxed">{pickEn(locale, site.prueba, site.pruebaEn)}</p>
+        </>
+      ) : null}
         </>
       ) : null}
 
-      <NasaPower site={site} />
-
-      {diffs.length > 0 ? (
+      {tab === "nasa" ? (
         <>
-          <h4 className="display mt-4 text-2xl text-muted">{t("byCategory")}</h4>
+      <NasaPower site={site} />
+      {site.p ? (
+        <section className="mt-4">
+          <h4 className="display text-2xl text-muted">{t("profile")}</h4>
+          <RadarChart
+            earth={earthProfile(site)}
+            target={target.p}
+            targetName={objetivo}
+            known={DIMS.map((dim) => categoryKnown(site, dim.key))}
+          />
+        </section>
+      ) : null}
+      <Dossier site={site} parts={["facts", "geology", "verify"]} />
+        </>
+      ) : null}
+
+      {tab === "comparar" ? (
+        <>
+          {diffs.length > 0 ? (
+          <>
+          <h4 className="display text-2xl text-muted">{t("byCategory")}</h4>
           <div className="mt-3 space-y-3">
             {diffs.map((item) => (
               <div key={item.key}>
@@ -884,8 +1008,20 @@ function Detail({ site, target, weights }: { site: Site; target: Target; weights
               {objetivo}
             </span>
           </div>
+          </>
+          ) : null}
+          <Dossier site={site} parts={["comparison", "limits"]} />
         </>
       ) : null}
+
+      {tab === "fuentes" ? (
+        <>
+          <SiteSources site={site} />
+          <Logistics site={site} />
+          <Dossier site={site} parts={["projects"]} />
+        </>
+      ) : null}
+      </div>
     </article>
   );
 }
@@ -897,7 +1033,8 @@ function Logistics({ site }: { site: Site }) {
     [t("permits"), site.logistica?.permisos],
     [t("season"), site.logistica?.temporada],
     [t("nearestCity"), site.logistica?.ciudad],
-  ] as const;
+  ].filter((row): row is [string, string] => Boolean(row[1]?.trim()));
+  if (rows.length === 0) return null;
 
   return (
     <section className="mt-4">
@@ -906,33 +1043,28 @@ function Logistics({ site }: { site: Site }) {
         {rows.map(([label, value]) => (
           <div key={label} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 border-b border-line py-1.5">
             <dt className="text-sm text-muted">{label}</dt>
-            <dd className={`text-right text-sm ${value ? "" : "text-muted"}`}>{value || t("toFill")}</dd>
+            <dd className="text-right text-sm">{value}</dd>
           </div>
         ))}
       </dl>
-      <p className="mt-1 text-[11px] text-muted">{t("permitsNote")}</p>
     </section>
   );
 }
 
-function Dossier({ site }: { site: Site }) {
+function Dossier({
+  site,
+  parts,
+}: {
+  site: Site;
+  parts: Array<"facts" | "geology" | "comparison" | "limits" | "verify" | "projects">;
+}) {
   const { t } = useI18n();
   const hasFacts = site.altitud || site.ubicacion || site.tipoTerreno;
-  if (
-    !hasFacts &&
-    !site.geologia?.length &&
-    !site.comparacion &&
-    !site.pruebas?.length &&
-    !site.limitaciones?.length &&
-    !site.verificacionNasa?.length &&
-    !site.proyectos?.length
-  ) {
-    return null;
-  }
+  const show = (part: (typeof parts)[number]) => parts.includes(part);
 
   return (
     <div className="mt-4 space-y-4">
-      {hasFacts ? (
+      {show("facts") && hasFacts ? (
         <dl className="grid gap-2 text-sm">
           {site.altitud ? (
             <div>
@@ -955,9 +1087,9 @@ function Dossier({ site }: { site: Site }) {
         </dl>
       ) : null}
 
-      <FactList title={t("geology")} items={site.geologia} />
+      {show("geology") ? <FactList title={t("geology")} items={site.geologia} /> : null}
 
-      {site.comparacion ? (
+      {show("comparison") && site.comparacion ? (
         <section>
           <h4 className="display text-2xl text-muted">{t("comparison")}</h4>
           <p className="mt-1 text-sm font-semibold">{site.comparacion.lugar}</p>
@@ -965,10 +1097,9 @@ function Dossier({ site }: { site: Site }) {
         </section>
       ) : null}
 
-      <FactList title={t("testsAllowed")} items={site.pruebas} />
-      <FactList title={t("limits")} items={site.limitaciones} />
+      {show("limits") ? <FactList title={t("limits")} items={site.limitaciones} /> : null}
 
-      {site.verificacionNasa && site.verificacionNasa.length > 0 ? (
+      {show("verify") && site.verificacionNasa && site.verificacionNasa.length > 0 ? (
         <section>
       <h4 className="section-title">{t("howToVerify")}</h4>
           <ul className="mt-1 space-y-1.5 text-sm leading-relaxed">
@@ -981,7 +1112,7 @@ function Dossier({ site }: { site: Site }) {
         </section>
       ) : null}
 
-      <FactList title={t("recommended")} items={site.proyectos} />
+      {show("projects") ? <FactList title={t("recommended")} items={site.proyectos} /> : null}
     </div>
   );
 }
@@ -996,14 +1127,15 @@ function SiteMark({ site, className = "" }: { site: Site; className?: string }) 
 }
 
 function SiteSources({ site }: { site: Site }) {
-  const { t } = useI18n();
-  if (!site.usoNasa && !site.fuentes?.length) return null;
+  const { locale, t } = useI18n();
+  const nasaUse = pickEn(locale, site.usoNasa, site.usoNasaEn);
+  if (!nasaUse && !site.fuentes?.length) return null;
   return (
     <>
-      {site.usoNasa ? (
+      {nasaUse ? (
         <section className="mt-4">
           <h4 className="display text-2xl text-muted">{t("nasaUse")}</h4>
-          <p className="mt-1 text-sm leading-relaxed">{site.usoNasa}</p>
+          <p className="mt-1 text-sm leading-relaxed">{nasaUse}</p>
         </section>
       ) : null}
       {site.fuentes && site.fuentes.length > 0 ? (

@@ -197,6 +197,23 @@ input[type="range"]::-moz-range-thumb {
   background: #050505;
 }
 
+@media (min-width: 768px) {
+  .map-stage .maplibregl-ctrl-top-right,
+  .map-stage .maplibregl-ctrl-bottom-right {
+    right: 348px;
+  }
+}
+
+.sheet-slide {
+  transition: transform 250ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-slide {
+    transition: none;
+  }
+}
+
 .intro-globe .maplibregl-ctrl {
   display: none;
 }

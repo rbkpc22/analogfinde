@@ -47,7 +47,7 @@ export function useI18n(): I18n {
 export function LanguageToggle() {
   const { locale, setLocale, t } = useI18n();
   return (
-    <div className="flex border border-line" role="group" aria-label={t("language")}>
+    <div className="flex shrink-0 border border-line" role="group" aria-label={t("language")}>
       {(["es", "en"] as const).map((item) => (
         <button
           key={item}

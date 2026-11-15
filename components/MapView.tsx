@@ -16,6 +16,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 setWorkerUrl("/maplibre-worker");
 import { useI18n } from "@/components/LocaleProvider";
+import { pickEn, siteName } from "@/lib/i18n";
 import { formatCoord } from "@/lib/point";
 import { coveredCategories } from "@/lib/score";
 import type { MapSite, MapViewProps } from "@/lib/view";
@@ -129,7 +130,7 @@ function collection(sites: MapSite[], selectedName: string | null) {
   };
 }
 
-function popupHtml(site: MapSite, copy: PopupCopy) {
+function popupHtml(site: MapSite, copy: PopupCopy, locale: "es" | "en") {
   const candidato =
     site.estado === "candidato"
       ? `<div style="margin:4px 0 6px;font-size:11px;letter-spacing:0.14em">${esc(copy.candidate)}</div>`
@@ -145,13 +146,13 @@ function popupHtml(site: MapSite, copy: PopupCopy) {
   ].join("");
   const more = site.geologia?.length || site.comparacion || site.pruebas?.length
     ? `<p>${esc(copy.more)}</p>`
-    : site.desc
-      ? `<p>${esc(site.desc)}</p>`
+    : pickEn(locale, site.desc, site.descEn)
+      ? `<p>${esc(pickEn(locale, site.desc, site.descEn))}</p>`
       : "";
   return (
-    `<h3>${esc(site.name)}</h3>` +
+    `<h3>${esc(siteName(locale, site))}</h3>` +
     candidato +
-    `<div>${esc(site.where)}</div>` +
+    `<div>${esc(pickEn(locale, site.where, site.whereEn))}</div>` +
     extra +
     `<div><b>${esc(copy.score)}</b> ${site.score}</div>` +
     (partial ? `<div style="font-size:11px;letter-spacing:0.04em">${esc(partial)}</div>` : "") +
@@ -183,6 +184,8 @@ export default function MapView({
   const syncRef = useRef<() => void>(() => {});
   const flyRef = useRef<() => void>(() => {});
   const { locale, t } = useI18n();
+  const localeRef = useRef(locale);
+  localeRef.current = locale;
   const labelsRef = useRef<PopupCopy>({
     candidate: "",
     altitude: "",
@@ -270,7 +273,7 @@ export default function MapView({
         crosshair.remove();
         return;
       }
-      markerLabel.textContent = selected.name;
+      markerLabel.textContent = siteName(localeRef.current, selected);
       crosshair.setLngLat([selected.lng, selected.lat]).addTo(mapa);
     };
 
@@ -278,7 +281,7 @@ export default function MapView({
       popupRef.current?.remove();
       popupRef.current = new Popup({ offset: 12, maxWidth: "260px" })
         .setLngLat([site.lng, site.lat])
-        .setHTML(popupHtml(site, labelsRef.current))
+        .setHTML(popupHtml(site, labelsRef.current, localeRef.current))
         .addTo(mapa);
     };
 
@@ -465,7 +468,7 @@ export default function MapView({
   useEffect(() => {
     syncRef.current();
     const selected = sites.find((site) => site.name === selectedName);
-    if (selected && popupRef.current?.isOpen()) popupRef.current.setHTML(popupHtml(selected, labelsRef.current));
+    if (selected && popupRef.current?.isOpen()) popupRef.current.setHTML(popupHtml(selected, labelsRef.current, locale));
   }, [sites, selectedName, locale]);
 
   useEffect(() => {
@@ -553,14 +556,14 @@ export default function MapView({
         id="volver"
         type="button"
         onClick={volver}
-        className={`absolute top-[52px] right-2.5 z-10 border border-accent bg-panel px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-accent uppercase min-[641px]:top-2.5 min-[641px]:right-14 ${
+        className={`absolute bottom-14 left-1/2 z-10 -translate-x-1/2 border border-accent bg-panel px-3 py-2 font-mono text-[11px] tracking-[0.14em] text-accent uppercase ${
           closeUp ? "" : "hidden"
         }`}
       >
         {t("backToGlobe")}
       </button>
       {cursor ? (
-        <p className="pointer-events-none absolute bottom-2 left-3 z-10 font-mono text-[11px] tracking-[0.04em] text-[var(--text)] tabular-nums">
+        <p className="pointer-events-none absolute bottom-3 left-40 z-10 font-mono text-[11px] tracking-[0.04em] text-[var(--text)] tabular-nums">
           {cursor}
         </p>
       ) : null}

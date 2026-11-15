@@ -76,6 +76,7 @@ export default function MetodologiaPage() {
           </ul>
           <p className="mt-2">{t("pageSourcesNote")}</p>
         </section>
+        <p className="border-t border-line pt-4 text-[11px] leading-relaxed text-muted">{t("versionNote")}</p>
       </article>
     </main>
   );
